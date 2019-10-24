@@ -1,0 +1,47 @@
+#goal definition
+char type
+int32 d0
+int32 d1
+float32 data
+float32[6] coordinate
+float32 spd
+float32 acc
+float32[3] wheel
+
+---
+
+#result definition
+int32 rb5result
+int32 wheelresult
+string state
+int32  power
+string mode
+int32  collision
+int32  freedrive
+float32 speed
+float32[6] joint_ang
+float32[6] joint_ref
+float32[6] joint_cur
+float32[6] joint_temp
+int32[6]   joint_info
+float32[6] tcp_ref
+float32[6] tcp_pos
+float32 tool_ref
+
+---
+
+#feedback	
+string state
+int32  power
+string mode
+int32  collision
+int32  freedrive
+float32 speed
+float32[6] joint_ang
+float32[6] joint_ref
+float32[6] joint_cur
+float32[6] joint_temp
+int32[6] joint_info
+float32[6] tcp_ref
+float32[6] tcp_pos
+float32 tool_ref
