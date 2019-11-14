@@ -15,6 +15,12 @@ find_package(catkin REQUIRED COMPONENTS
 add_action_files(
   DIRECTORY action
   FILES Motion.action
+  FILES manipulation.action
+)
+
+add_message_files(
+  FILES
+  update.msg
 )
 
 generate_messages(DEPENDENCIES actionlib_msgs std_msgs geometry_msgs)
@@ -32,6 +38,9 @@ target_link_libraries(RB5_Client_Fixed ${catkin_LIBRARIES})
 
 add_executable(RB5_Client_yujin src/RB5_Client_yujin.cpp)
 target_link_libraries(RB5_Client_yujin ${catkin_LIBRARIES})
+
+add_executable(Grasp_motion src/Grasp_motion.cpp)
+target_link_libraries(Grasp_motion ${catkin_LIBRARIES})
 
 add_executable(image_motion src/image_capture_motion.cpp)
 target_link_libraries(image_motion ${catkin_LIBRARIES})

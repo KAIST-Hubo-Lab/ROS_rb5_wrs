@@ -12,3 +12,18 @@ LANROS2PODO::~LANROS2PODO()
     delete [] buffer;
     buffer = nullptr;
 }
+
+/*bool LANROS2PODO::requestJoints(bool request)
+{
+    if(request == true)
+    {
+        this->command.jointRequest = true;
+        return command.jointRequest;
+    }
+    else
+    {
+        this->command.jointRequest = false;
+        return command.jointRequest;
+    }
+}
+*/

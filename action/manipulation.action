@@ -1,0 +1,21 @@
+#goal definition
+int32 motion_cmd #(=function Cmd) 0:ready 1:search 2:grasp 3:open
+int32 object_id #0:kimbap1 1:kimbap2 2:sanwich 3:hambug_thin 4:hambug_fat 5:coffee 6:lunchbox
+float64 pose_x
+float64 pose_y
+float64 pose_z
+float64 ori_r #roll
+float64 ori_p #pitch
+float64 ori_y #yaw
+---
+#result definition
+int32 result_flag #0:fail 1:success
+float64 pose_x
+float64 pose_y
+float64 pose_z
+float64 ori_r #roll
+float64 ori_p #pitch
+float64 ori_y #yaw
+---
+#feedback
+int32 dummy

@@ -33,8 +33,6 @@ char CMD_WheelMove = 'W';
 
 
 
-
-
 class State
 {
 public:
@@ -50,29 +48,69 @@ public:
     void doInit()
     {
         //need to initialize the robot before sending commands
-//        command(CMD_Initialize,0,0,0,0,0, 0, 0, 0, 0,0,0);
-//        ROS_INFO("Initializing.");
-//        SendGoalandWait();
+        command(CMD_Initialize,0,0,0,0,0, 0, 0, 0, 0,0,0);
+        ROS_INFO("Initializing.");
+        SendGoalandWait();
 
+        //set mode
+        command(CMD_RealMode,0,0,0,0,0, 0, 0, 0, 0,0,0);
+        ROS_INFO("Setting to real mode.");
+        SendGoalandWait();
 
-//        //set mode
-//        command(CMD_RealMode,0,0,0,0,0, 0, 0, 0, 0,0,0);
-//        ROS_INFO("Setting to real mode.");
-//        SendGoalandWait();
+        //change speed to 0.6
+        command(CMD_ChangeSpeed,0,0,0.6,0,0, 0, 0, 0, 0,0,0);
+        ROS_INFO("Changing speed.");
+        SendGoalandWait();
 
-//        //change speed to 0.6
-//        command(CMD_ChangeSpeed,0,0,0.6,0,0, 0, 0, 0, 0,0,0);
-//        ROS_INFO("Changing speed.");
-//        SendGoalandWait();
-
+        doTest();
         //move add
 //        gofront();
-        //set to home
+//        //set to home
 //        goHome();
 //        GripperTest();
 
-        WheelTest();
+//        WheelTest();
     }
+    void doTest()
+        {
+            //RB5 move pose1
+            command(CMD_MoveTCP, 0,0,0, -123,-185,414,90,0,0,0.8,0.3);
+            ROS_INFO("RB5 : pose1(TCP)");
+            SendGoalandWait();
+
+            closeGripper();
+
+            //Wheel Move +x 1.0m
+            commandwheel(CMD_WheelMove,0,1,0.5,0,0);
+            ROS_INFO("Wheel move(GoalMode) : +1mx");
+            SendGoalandWait();
+
+            //RB5 move pose2
+            command(CMD_MoveTCP, 0,0,0, -123,-385,414,90,0,0,0.8,0.3);
+            ROS_INFO("RB5 : pose2(TCP)");
+            SendGoalandWait();
+
+            openGripper();
+
+            //RB5 move pose3
+            command(CMD_MoveTCP, 0,0,0, -123,-385,200,90,0,0,0.8,0.3);
+            ROS_INFO("RB5 : pose3(TCP)");
+            SendGoalandWait();
+
+            closeGripper();
+
+            //RB5 move pose2
+            command(CMD_MoveTCP, 0,0,0, -123,-385,414,90,0,0,0.8,0.3);
+            ROS_INFO("RB5 : pose2(TCP)");
+            SendGoalandWait();
+
+            //RB5 move pose1
+            command(CMD_MoveTCP, 0,0,0, -123,-185,414,90,0,0,0.8,0.3);
+            ROS_INFO("RB5 : pose1(TCP)");
+            SendGoalandWait();
+
+            ROS_INFO("All done");
+        }
 
     void doneCb(const actionlib::SimpleClientGoalState& state,
                 const rb5_ros_wrapper::MotionResultConstPtr& result)

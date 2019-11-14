@@ -9,6 +9,7 @@
 #include <actionlib/server/simple_action_server.h>
 #include <rb5_ros_wrapper/MotionAction.h>
 #include <math.h>
+#include "rb5_ros_wrapper/update.h"
 #include "lanros2podo.h"
 #include "lanpodo2ros.h"
 #define robot_idle      1
@@ -38,6 +39,8 @@ enum {
     ERROR_STOP
 };
 
+ros::Publisher robot_states_pub;
+rb5_ros_wrapper::update message;
 
 bool connectROS()
 {
@@ -189,7 +192,11 @@ public:
             switch(RXresult.message.rb5result)
             {
             case ACCEPT:
-                ROS_INFO("PODO accept command");
+                if(activeFlag != true)
+                {
+                    ROS_INFO("PODO accept rb5 command");
+                    activeFlag = true;
+                }
                 break;
             case STATE_ERROR:
             case INPUT_ERROR:
@@ -202,7 +209,11 @@ public:
             switch(RXresult.message.wheelresult)
             {
             case ACCEPT:
-                ROS_INFO("PODO accept command");
+                if(activeFlag != true)
+                {
+                    ROS_INFO("PODO accept wheel command");
+                    activeFlag = true;
+                }
                 break;
             case STATE_ERROR:
             case INPUT_ERROR:
@@ -243,11 +254,6 @@ public:
     void publishFeedback()
     {
         std::cout << "Publishing Feedback" << std::endl;
-
-        read(sock_status, RX.buffer, RX.size);
-
-        memcpy(&RX.message, RX.buffer, RX.size);
-
         if(RX.message.robot_state == robot_moving)
         {
             feedback_.state = "Moving";
@@ -284,12 +290,13 @@ public:
     }
 };
 
-
-
 int main(int argc, char *argv[])
 {
 
     ros::init(argc, argv, "rb5_ros_wrapper");
+
+    ros::NodeHandle n;
+    robot_states_pub = n.advertise<rb5_ros_wrapper::update>("robot_states",1);
 
     if(connectROS() == false)
     {
@@ -305,7 +312,37 @@ int main(int argc, char *argv[])
     ROS_INFO("Starting Action Server");
     MotionAction motion("motion");
 
-    ros::spin();
+    while(1)
+    {
+        //read robot status from PODO
+        read(sock_status, RX.buffer, RX.size);
+        memcpy(&RX.message, RX.buffer, RX.size);
+
+        //publish robot status
+        message.robot_state = RX.message.robot_state;
+        message.power_state = RX.message.power_state;
+        message.program_mode = RX.message.program_mode;
+        message.collision_detect = RX.message.collision_detect;
+        message.freedrive_mode = RX.message.freedrive_mode;
+        message.speed = RX.message.speed;
+        message.tool_reference = RX.message.tool_reference;
+
+        for(int i=0;i<6;i++)
+        {
+            message.joint_angles[i] = RX.message.joint_angles[i];
+            message.joint_references[i] = RX.message.joint_references[i];
+            message.joint_current[i] = RX.message.joint_current[i];
+            message.joint_temperature[i] = RX.message.joint_temperature[i];
+            message.joint_information[i] = RX.message.joint_information[i];
+            message.tcp_reference[i] = RX.message.tcp_reference[i];
+            message.tcp_position[i] = RX.message.tcp_position[i];
+        }
+        robot_states_pub.publish(message);
+
+
+        //callback check
+        ros::spinOnce();
+    }
 
     return 0;
 }
