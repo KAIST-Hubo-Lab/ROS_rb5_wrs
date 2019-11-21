@@ -7,11 +7,15 @@
 #include <iostream>
 #include <chrono>
 #include <actionlib/server/simple_action_server.h>
+#include <tf/transform_broadcaster.h>
 #include <rb5_ros_wrapper/MotionAction.h>
 #include <math.h>
+#include <wrs_fsm/tf_broadcast.h>
 #include "rb5_ros_wrapper/update.h"
 #include "lanros2podo.h"
 #include "lanpodo2ros.h"
+#define D2R             0.0174533
+#define R2D             57.2958
 #define robot_idle      1
 #define robot_paused    2
 #define robot_moving    3
@@ -40,7 +44,12 @@ enum {
 };
 
 ros::Publisher robot_states_pub;
+ros::Publisher marker_tf_pub;
+ros::Subscriber marker_tf_sub;
 rb5_ros_wrapper::update message;
+
+float marker_x,marker_y,marker_z,marker_wx,marker_wy,marker_wz = 0.;
+float marker_w = 1.;
 
 bool connectROS()
 {
@@ -290,13 +299,30 @@ public:
     }
 };
 
+void markerCallback(const wrs_fsm::tf_broadcastPtr& msg)
+{
+    marker_x = msg->x ;
+    marker_y = msg->y ;
+    marker_z = msg->z ;
+    marker_w = msg->w ;
+    marker_wx= msg->wx;
+    marker_wy= msg->wy;
+    marker_wz= msg->wz;
+}
+
 int main(int argc, char *argv[])
 {
 
     ros::init(argc, argv, "rb5_ros_wrapper");
 
     ros::NodeHandle n;
-    robot_states_pub = n.advertise<rb5_ros_wrapper::update>("robot_states",1);
+    robot_states_pub = n.advertise<wrs_fsm::tf_broadcast>("robot_states",1);
+    marker_tf_sub = n.subscribe("/marker_tf", 10, &markerCallback);
+
+    tf::TransformBroadcaster br;
+    tf::Transform Trb5_wrist, Trb5_base, Trb5_gripper, Trb5_suction, Trb5_camera, Trb5_marker;
+    tf::Quaternion tempq;
+
 
     if(connectROS() == false)
     {
@@ -312,6 +338,7 @@ int main(int argc, char *argv[])
     ROS_INFO("Starting Action Server");
     MotionAction motion("motion");
 
+
     while(1)
     {
         //read robot status from PODO
@@ -326,6 +353,53 @@ int main(int argc, char *argv[])
         message.freedrive_mode = RX.message.freedrive_mode;
         message.speed = RX.message.speed;
         message.tool_reference = RX.message.tool_reference;
+
+        //TF broadcasting
+        ros::Time now = ros::Time::now();
+
+        Trb5_base.setOrigin(tf::Vector3(0.26, 0., 0.902));
+        tempq.setEulerZYX(90.*D2R, 0., 0.);
+        Trb5_base.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_base, now, "/base_link", "/rb5/base"));
+
+        Trb5_wrist.setOrigin(tf::Vector3(RX.message.tcp_position[0]/1000.,RX.message.tcp_position[1]/1000.,RX.message.tcp_position[2]/1000.));
+        tempq.setEulerZYX(RX.message.tcp_position[5]*D2R, RX.message.tcp_position[4]*D2R, RX.message.tcp_position[3]*D2R);
+        Trb5_wrist.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_wrist, now, "/rb5/base", "/rb5/wrist"));
+
+        Trb5_gripper.setOrigin(tf::Vector3(0.00035, -0.22122, 0.));
+        tempq.setEulerZYX(0., 0., 0.);
+        Trb5_gripper.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_gripper, ros::Time::now(), "/rb5/wrist", "/rb5/gripper"));
+
+        Trb5_suction.setOrigin(tf::Vector3(0.00025, -0.07345, -0.143));
+        tempq.setEulerZYX(0., 0., 90.*D2R);
+        Trb5_suction.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_suction, ros::Time::now(), "/rb5/wrist", "/rb5/suction"));
+
+        Trb5_camera.setOrigin(tf::Vector3(0.0325, -0.1008, 0.0730));
+        tempq.setEulerZYX(180.*D2R, 0., -90.*D2R);
+        Trb5_camera.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_camera, ros::Time::now(), "/rb5/wrist", "/camera1"));
+
+        marker_x = 0.0349;
+        marker_y = 0.0189;
+        marker_z = 0.2845;
+        marker_w = 0.51;
+        marker_wx= -0.49;
+        marker_wy= 0.489;
+        marker_wz= -0.503;
+
+        Trb5_marker.setOrigin(tf::Vector3(marker_x,marker_y,marker_z));
+        tempq = tf::Quaternion(marker_wx,marker_wy,marker_wz,marker_w);
+        Trb5_marker.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_marker, ros::Time::now(), "/camera1", "/marker1"));
+
+//        tf::Matrix3x3 markerYPR = Trb5_marker.getBasis();
+//        tf::Vector3 markerXYZ = Trb5_marker.getOrigin();
+//        double mr,mp,my;
+//        markerYPR.getEulerYPR(my,mp,mr);
+//        printf("pos = %f, %f, %f, %f, %f, %f\n",markerXYZ.x(),markerXYZ.y(),markerXYZ.z(),mr*R2D,mp*R2D,my*R2D);
 
         for(int i=0;i<6;i++)
         {
