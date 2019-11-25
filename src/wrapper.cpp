@@ -46,10 +46,13 @@ enum {
 ros::Publisher robot_states_pub;
 ros::Publisher marker_tf_pub;
 ros::Subscriber marker_tf_sub;
+ros::Subscriber shelf_marker_tf_sub;
 rb5_ros_wrapper::update message;
 
 float marker_x,marker_y,marker_z,marker_wx,marker_wy,marker_wz = 0.;
 float marker_w = 1.;
+float shelf_x,shelf_y,shelf_z,shelf_wx,shelf_wy,shelf_wz = 0.;
+float shelf_w = 1.;
 
 bool connectROS()
 {
@@ -140,7 +143,6 @@ public:
         TX.command.d0 = goal->d0;
         TX.command.d1 = goal->d1;
 
-        std::cout << "TX.command.type = " << TX.command.type << std::endl;
         std::cout << "TX.command.d0 = " << TX.command.d0 << std::endl;
         std::cout << "TX.command.d1 = " << TX.command.d1 << std::endl;
 
@@ -153,9 +155,6 @@ public:
         {
             TX.command.wheel[i] = goal->wheel[i];
         }
-        
-        std::cout << "TX.command.wheel[2] = " << TX.command.wheel[2] << std::endl;
-
 
         TX.command.spd = goal->spd;
         TX.command.acc = goal->acc;
@@ -187,10 +186,6 @@ public:
 
         //loop until TX complete
 
-        if(goal->type == 'N')
-        {
-            return;
-        }
         while(rxDoneFlag == 0)
         {
             //check that preempt has not been requested by client
@@ -219,7 +214,6 @@ public:
             case INPUT_ERROR:
             case DONE:
             case ERROR_STOP:
-                ROS_INFO("PODO send rb5 result");
                 rxDoneFlag = 1;
                 break;
             }
@@ -237,7 +231,6 @@ public:
             case INPUT_ERROR:
             case DONE:
             case ERROR_STOP:
-                ROS_INFO("PODO send wheel result");
                 rxDoneFlag = 1;
                 break;
             }
@@ -320,6 +313,17 @@ void markerCallback(const wrs_fsm::tf_broadcastPtr& msg)
     marker_wz= msg->wz;
 }
 
+void shelfCallback(const wrs_fsm::tf_broadcastPtr& msg)
+{
+    shelf_x = msg->x ;
+    shelf_y = msg->y ;
+    shelf_z = msg->z ;
+    shelf_w = msg->w ;
+    shelf_wx= msg->wx;
+    shelf_wy= msg->wy;
+    shelf_wz= msg->wz;
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -328,6 +332,7 @@ int main(int argc, char *argv[])
     ros::NodeHandle n;
     robot_states_pub = n.advertise<wrs_fsm::tf_broadcast>("robot_states",1);
     marker_tf_sub = n.subscribe("/marker_tf", 10, &markerCallback);
+    shelf_marker_tf_sub = n.subscribe("/shelf_marker_tf", 10, &shelfCallback);
 
     tf::TransformBroadcaster br;
     tf::Transform Trb5_wrist, Trb5_base, Trb5_gripper, Trb5_suction, Trb5_camera, Trb5_marker;
@@ -392,18 +397,15 @@ int main(int argc, char *argv[])
         Trb5_camera.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_camera, ros::Time::now(), "/rb5/wrist", "/camera1"));
 
-        marker_x = 0.0349;
-        marker_y = 0.0189;
-        marker_z = 0.2845;
-        marker_w = 0.51;
-        marker_wx= -0.49;
-        marker_wy= 0.489;
-        marker_wz= -0.503;
-
         Trb5_marker.setOrigin(tf::Vector3(marker_x,marker_y,marker_z));
         tempq = tf::Quaternion(marker_wx,marker_wy,marker_wz,marker_w);
         Trb5_marker.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_marker, ros::Time::now(), "/camera1", "/marker1"));
+
+        Trb5_marker.setOrigin(tf::Vector3(shelf_x,shelf_y,shelf_z));
+        tempq = tf::Quaternion(shelf_wx,shelf_wy,shelf_wz,shelf_w);
+        Trb5_marker.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_marker, ros::Time::now(), "/camera1", "/shelf"));
 
 //        tf::Matrix3x3 markerYPR = Trb5_marker.getBasis();
 //        tf::Vector3 markerXYZ = Trb5_marker.getOrigin();
