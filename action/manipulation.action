@@ -1,6 +1,9 @@
 #goal definition
-int32 motion_cmd #(=function Cmd) 0:ready 1:search 2:grasp 3:open
-int32 object_id #0:kimbap1 1:kimbap2 2:sanwich 3:hambug_thin 4:hambug_fat 5:coffee 6:lunchbox
+int32 motion_cmd #(=function Cmd) 0:ready 1:search 2:grasp 3:open 4:pullshelf 5:pushshelf
+int32 object_id  #0:kimbap1 1:kimbap2 2:sanwich 3:hambug_thin 4:hambug_fat 5:coffee 6:lunchbox
+int32 tool_id    #0:gripper 1:suction
+int32 shelf_id   #1,2,3 floor
+int32 sub_cmd    #sub cmd..
 float64 pose_x
 float64 pose_y
 float64 pose_z
