@@ -21,6 +21,12 @@ find_package(OpenCV REQUIRED)
 add_action_files(
   DIRECTORY action
   FILES Motion.action
+  FILES manipulation.action
+)
+
+add_message_files(
+  FILES
+  update.msg
 )
 
 generate_messages(DEPENDENCIES actionlib_msgs std_msgs geometry_msgs)
@@ -49,8 +55,6 @@ target_link_libraries(RB5_Client_yujin ${catkin_LIBRARIES})
 add_executable(image_motion src/image_capture_motion.cpp)
 target_link_libraries(image_motion ${catkin_LIBRARIES})
 
-add_executable(image_save_KIST src/image_save_KIST.cpp)
-target_link_libraries(image_save_KIST ${catkin_LIBRARIES})
 
 add_executable(base_navigation_rb5 src/base_navigation_rb5.cpp)
 target_link_libraries(base_navigation_rb5 ${catkin_LIBRARIES})

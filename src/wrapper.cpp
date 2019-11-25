@@ -131,6 +131,7 @@ public:
         TX.command.d0 = goal->d0;
         TX.command.d1 = goal->d1;
 
+        std::cout << "TX.command.type = " << TX.command.type << std::endl;
         std::cout << "TX.command.d0 = " << TX.command.d0 << std::endl;
         std::cout << "TX.command.d1 = " << TX.command.d1 << std::endl;
 
@@ -143,6 +144,9 @@ public:
         {
             TX.command.wheel[i] = goal->wheel[i];
         }
+        
+        std::cout << "TX.command.wheel[2] = " << TX.command.wheel[2] << std::endl;
+
 
         TX.command.spd = goal->spd;
         TX.command.acc = goal->acc;
@@ -174,6 +178,10 @@ public:
 
         //loop until TX complete
 
+        if(goal->type == 'N')
+        {
+            return;
+        }
         while(rxDoneFlag == 0)
         {
             //check that preempt has not been requested by client
@@ -202,6 +210,7 @@ public:
             case INPUT_ERROR:
             case DONE:
             case ERROR_STOP:
+                ROS_INFO("PODO send rb5 result");
                 rxDoneFlag = 1;
                 break;
             }
@@ -219,6 +228,7 @@ public:
             case INPUT_ERROR:
             case DONE:
             case ERROR_STOP:
+                ROS_INFO("PODO send wheel result");
                 rxDoneFlag = 1;
                 break;
             }

@@ -32,9 +32,7 @@
 #include <actionlib/client/terminal_state.h>
 #include <cmath>
 /*custom defined Action header for robot motion */
-//hubo
-#include <ros_podo_connector/RosPODOmotionAction.h>
-#include <ros_podo_connector/RosPODO_BaseAction.h>
+
 //rb5
 #include <rb5_ros_wrapper/MotionAction.h>
 #include <rb5_ros_wrapper/MotionActionGoal.h>
@@ -88,7 +86,6 @@ int arrived_goal = 0;
 int move_flag = 0;
 
 //marker align flag
-int use_aruco_marker = 1;
 int have_aligned = 0;
 int marker_detected = 0;
 
@@ -99,6 +96,14 @@ int orientation_aligned_finished = 0;
 float marker_x, marker_y, marker_z;
 float marker_robot_x, marker_robot_y, marker_robot_z;
 float roll_marker, pitch_marker, yaw_marker;
+
+//state flags
+int robot_move_request = 0;
+int use_aruco_marker = 0;
+int use_navi = 0;
+
+//state machine var
+int state_variable = 0;
 
 
 ros::Time currentTime, beginTime;
@@ -117,11 +122,10 @@ std::ofstream outputFile;
 /* receive goal pose from Navi Action */
 void receive_goal_pose_action(const mobile_path_planning::naviActionGoalConstPtr &goal)
 {
-
+	
 	//update flag to start new motion
-	initial_robot_rotation_flag = 1;
-	orientation_align_start = 1;
-    orientation_aligned_finished = 0;
+	robot_move_request = 1;
+
     
     //get goal pose
     temporary_goal_pose.position.x = goal->goal.pose_x;
@@ -145,6 +149,8 @@ void receive_goal_pose_action(const mobile_path_planning::naviActionGoalConstPtr
 		ROS_INFO("DONT USE FLAG");
 	}
     
+    //hard coded off temporary
+    use_navi = 0;
     
     
 	//convert quaternion to euler
@@ -199,7 +205,7 @@ void velocity_from_path(const nav_msgs::Path::ConstPtr& msg)
     
 
     int pathSize = msg->poses.size();
-    //ROS_INFO("path size: %d", pathSize); 
+    ROS_INFO("path size: %d", pathSize); 
     
     received_path = 1;
     
@@ -209,6 +215,8 @@ void velocity_from_path(const nav_msgs::Path::ConstPtr& msg)
 		move_flag = 1;
 		have_aligned = 0;
 	}
+	
+	ROS_INFO("received path: %d, move flag: %d\n", received_path, move_flag); 
 	
         nav_msgs::Path pathDifferece; //vectory of differences in path
     geometry_msgs::PoseStamped temporaryPose; //used to fill
@@ -460,7 +468,6 @@ int main (int argc, char **argv)
 
     // create the action client
     // true causes the client to spin its own thread
-    actionlib::SimpleActionClient<ros_podo_connector::RosPODO_BaseAction> ac_base("rospodo_base", true);
     actionlib::SimpleActionClient<rb5_ros_wrapper::MotionAction> ac_motion("motion", true);
    
     // wait for the action server to start
@@ -470,7 +477,6 @@ int main (int argc, char **argv)
 
     // create goal instance
     rb5_ros_wrapper::MotionGoal      goal_motion;
-    ros_podo_connector::RosPODO_BaseGoal      goal_base;
 
 
     /* ============== Initialize ==============  */
@@ -500,130 +506,147 @@ int main (int argc, char **argv)
     while(ros::ok())
     {
 		
-		
+		ROS_INFO("rotation flag: %d, received path: %d, move flag: %d\n", initial_robot_rotation_flag, received_path, move_flag); 
 
-        /* 1st Motion: Rotate robot using position command */
-        if(initial_robot_rotation_flag == 1)
-        {
-			
-			//send rotate command (pos mode 01)
-			goal_motion.type = 'w';
-			goal_motion.d0 = 0; 
-			goal_motion.d1 = 1; 
-			goal_motion.wheel[0] = 0; //moveX
-			goal_motion.wheel[1] = 0; //moveY
-			
-			temp_rad = yaw_goal_rad - yaw_current_rad;
-			
-			// [-PI, PI] range, bound 2PI turns from subtraction
-			if(temp_rad >= PI) goal_motion.wheel[2]  = temp_rad - 2*PI;		
-			else if(temp_rad <= -1*PI) goal_motion.wheel[2]   = temp_rad + 2*PI;			
-			//within bound
-			else goal_motion.wheel[2]  = temp_rad;
-
-			ROS_INFO("1st Motion: intial rotate x: %.3f, y: %.3f, thetaGoal: %.3f, thetaCurrent: %.3f, thetaMove: %.3f\n", goal_motion.wheel[0] ,goal_motion.wheel[1], yaw_goal_rad*R2Df, yaw_current_rad*R2Df, goal_motion.wheel[2]*R2Df); 
-			
-			//wait until done or timeout
-			ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
-									
-			//turn off flag 1 time call once finished action
-			initial_robot_rotation_flag = 0;
-			
-			ROS_INFO("1st Motion: initial rotation motion done");
-		}
+        
 		
-		else //after intial rotation. follow path & align to marker
+		/*state_variable
+		 * 00 idle
+		 * 01 no navi, no marker
+		 * 02 no navi, yes marker align
+		 * 10 yes navi, rotation motion 
+		 * 11 yes navi, path follow 
+		 * 12 yes navi, yes marker align
+		 * 20 done
+		*/
+		switch(state_variable)
 		{
-			/* 2nd Motion: start following path using velocity command */
-			if( received_path == 1 && move_flag == 1)
-			{
-				goal_base.wheelmove_cmd = 0;//WHEEL_MOVE_VELOCITY;
-				goal_base.VelX = vx_out_robot;
-				goal_base.VelY = vy_out_robot;
-				ROS_INFO("2nd Motion: Follow path vx: %f, vy: %f\n", goal_base.VelX, goal_base.VelY); 
+			case(00):
 				
-				ac_base.sendGoal(goal_base);
-				//turn off marker detect flag from previous detects
-				//reset marker value before for 3rd motion
-				reset_marker_values();
-			
-				/* stop sending velocity command */
-				if(arrived_goal == 1)
+				ROS_INFO("===== case 00: idle =====");
+				
+				if(robot_move_request)
 				{
 					
+					if(use_navi == 0)
+					{
+						state_variable = 01;
+					}
 					
-					move_flag = 0;
-					goal_base.wheelmove_cmd = 0;//WHEEL_MOVE_STOP;
-					goal_base.VelX = 0;
-					goal_base.VelY = 0;
-					ROS_INFO("2nd Motion: STOP. velocity movement completed");
-					ac_base.sendGoal(goal_base);
+					else if(use_navi == 1)
+					{
+						state_variable = 10;
+					}
 					
-					//publish arrival flag to stop planning 
-					geometry_msgs::PoseStamped arrived;
-					arrived.pose.position.x = 1;
-					arrived_publisher.publish(arrived);
-					ros::spinOnce();
-					usleep(1000* 2 * 1000); 
-					
-
-				}		       
-			}
-		
-			/* 3rd Motion: align using aruco marker */
-			if(move_flag == 0 && orientation_align_start == 1)
-			{
-				
-				ros::spinOnce();
-				
-				//no marker detected
-				if(marker_detected == 0)
-				{
-	
-					ROS_INFO("Finished: No marker detected! Not moving until next goal received"); 
+					else
+					{
+						state_variable = 00;
+					}	
 				}
-				//marker detected
+				break;
+		
+			case(01):
+				ROS_INFO("===== case 01: no navi! goal movement =====");
+				
+				//send local goal 
+				goal_motion.type = 'W';
+				goal_motion.d0 = 0; 
+				goal_motion.d1 = 1; 
+				goal_motion.wheel[0] = 0; //moveX
+				goal_motion.wheel[1] = 0; //moveY
+			
+				goal_motion.wheel[2] = yaw_goal_rad * R2Df;
+						
+				ROS_INFO("Rotation Motion x: %.3f, y: %.3f, theta: %.3f\n", goal_motion.wheel[0]  ,goal_motion.wheel[1] , goal_motion.wheel[2] ); 
+
+				ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
+				
+				//send local goal 
+				goal_motion.type = 'W';
+				goal_motion.d0 = 0; 
+				goal_motion.d1 = 1; 
+				goal_motion.wheel[0] = temporary_goal_pose.position.x*cos(yaw_goal_rad) + temporary_goal_pose.position.y*sin(yaw_goal_rad);
+				goal_motion.wheel[1] = -temporary_goal_pose.position.x*sin(yaw_goal_rad) + temporary_goal_pose.position.y*cos(yaw_goal_rad);
+				goal_motion.wheel[2] = 0;
+				
+						
+				ROS_INFO("Translation Motion x: %.3f, y: %.3f, theta: %.3f\n", goal_motion.wheel[0]  ,goal_motion.wheel[1] , goal_motion.wheel[2] ); 
+
+				ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
+				
+				
+				if(use_aruco_marker == 1)
+				{
+					//state_variable = 02; //intermediate step due to update
+					state_variable = 100;
+				}
+				
+				else 
+				{
+					state_variable = 20;
+				}
+				
+				usleep(1000* 2 * 1000); 
+				ros::spinOnce(); //update marker flag
+				//ensure previous marker flag is off 
+				reset_marker_values();
+				break;
+			
+			case(100):
+				ROS_INFO(" dummy state for updating marker flag");
+				ros::spinOnce(); //update marker flag
+				state_variable = 02;
+				break;
+				
+			case(02):
+				ros::spinOnce(); //update marker flag
+				ROS_INFO("===== case 02 no navi! Align marker =====");
+				
+				if(marker_detected == 1)
+				{
+					//send goal (w.r.t. robot local frame)
+					goal_motion.type = 'W';
+					goal_motion.d0 = 0; 
+					goal_motion.d1 = 1; 
+					goal_motion.wheel[0] = marker_robot_x;
+					goal_motion.wheel[1] = marker_robot_y;
+					goal_motion.wheel[2] = 0;
+				
+	
+							
+					ROS_INFO("Translation Motion x: %.3f, y: %.3f\n", marker_robot_x , marker_robot_y); 
+						
+					ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
+					
+					state_variable = 20;
+				}
+				
 				else
 				{
-					if(use_aruco_marker == 1 && have_aligned == 0)
-					{
-						//ROS_INFO("3rd Motion: Align robot!");
-						
-						
-						goal_base.wheelmove_cmd = 0;//WHEEL_MOVE_START;
-						goal_base.MoveX = marker_robot_x;
-						goal_base.MoveY = marker_robot_y;
-						goal_base.ThetaDeg = 0;
-						
-						ROS_INFO("3rd Motion: ALIGN translation x: %.3f, y: %.3f, theta: %.3f, thetaDeg: %.3f\n", marker_robot_x , marker_robot_y, goal_base.ThetaDeg, goal_base.ThetaDeg*R2Df); 
-					
-						ac_base.sendGoalAndWait(goal_base, ros::Duration(5));
-						
-						/*rotation align for marker. wait until aruco marker estimation has improved. too much noise in orientation.*/
-						/*
-						goal_base.wheelmove_cmd = WHEEL_MOVE_START;
-						goal_base.MoveX = 0;
-						goal_base.MoveY = 0;
-						goal_base.ThetaDeg = pitch_marker;
-						
-						ROS_INFO("3rd Motion: ALIGN rotation x: %.3f, y: %.3f, theta: %.3f, thetaDeg: %.3f\n", marker_robot_x , marker_robot_y, goal_base.ThetaDeg, goal_base.ThetaDeg*R2Df); 
-					
-						ac_base.sendGoalAndWait(goal_base, ros::Duration(5));
-						*/
-						have_aligned = 1;
-
-						
-						
-					}
+					ROS_INFO("couldn't detect marker. no motion.");
+					state_variable = 20;
 				}
 				
-				//end of 3rd motion
-				orientation_align_start = 0;
-				use_aruco_marker = 0; //reset flag
-				ROS_INFO("Finished all motion: Not moving until next goal received"); 
+				
+			case(20):
+				ROS_INFO("===== DONE MOTION ===== ");
+				
+				//publish arrival flag to stop planning 
+				geometry_msgs::PoseStamped arrived;
+				arrived.pose.position.x = 1;
+				arrived_publisher.publish(arrived);
+				
+				//reset flags
+				state_variable = 0;
+				robot_move_request = 0;
+				use_navi = 0;
+				marker_detected = 0;
+				
+				break;
+		}
 
-			}
-		}    
+		
+		
 
         
 		
