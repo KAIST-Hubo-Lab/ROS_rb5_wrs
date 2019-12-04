@@ -56,7 +56,6 @@ target_link_libraries(image_motion ${catkin_LIBRARIES})
 add_executable(base_navigation_rb5 src/base_navigation_rb5.cpp)
 target_link_libraries(base_navigation_rb5 ${catkin_LIBRARIES})
 
-=======
 
 catkin_package(
     CATKIN_DEPENDS

@@ -63,7 +63,7 @@ const float     PI   = 3.14159265;
 #define arrival_threshold 2 //arrival grid size
 #define averageWindowN 5    //sample number for low-pass filter
 #define grid_resolution 0.1 //meter
-#define marker_offset_z 0.5
+#define marker_offset_z 0.8
 
 /* ========= global variables ========== */
 ros::Publisher path_pub; //path difference
@@ -123,8 +123,8 @@ std::ofstream outputFile;
 void receive_goal_pose_action(const mobile_path_planning::naviActionGoalConstPtr &goal)
 {
 	
-	//update flag to start new motion
-	robot_move_request = 1;
+    //update flag to start new motion
+    robot_move_request = 1;
 
     
     //get goal pose
@@ -140,13 +140,13 @@ void receive_goal_pose_action(const mobile_path_planning::naviActionGoalConstPtr
     if(goal->goal.use_marker == 1)
     {
 		use_aruco_marker = 1;
-		ROS_INFO("USE FLAG");
+		ROS_INFO("USE marker FLAG");
 	}
 	
 	else
 	{
 		use_aruco_marker = 0;
-		ROS_INFO("DONT USE FLAG");
+		ROS_INFO("DONT USE marker FLAG");
 	}
     
     //hard coded off temporary
@@ -370,7 +370,7 @@ void position_from_marker(const geometry_msgs::PoseStamped::ConstPtr& msg)
 	//move only when arrived at goal and user requested to use marker alignment
 	if( (use_aruco_marker == 1) )
 	{
-		//ROS_INFO("detected marker!");
+		ROS_INFO("detected marker!");
 		marker_detected = 1;
 		//ROS_INFO("x: %.3f, y: %.3f, z:%.3f", msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
 		marker_x = msg->pose.position.x;
@@ -397,10 +397,6 @@ void position_from_marker(const geometry_msgs::PoseStamped::ConstPtr& msg)
 		
 		//data output test
 		//outputFile << marker_x << "," <<  marker_y << "," <<  marker_z << "," << msg->pose.orientation.x << "," <<  msg->pose.orientation.y << "," <<  msg->pose.orientation.z<< "," << msg->pose.orientation.w << "," <<  roll_marker << "," <<  pitch_marker* R2Df << "," << yaw_marker <<std::endl;
-
-    
-   
-			
 	}
 
 }
@@ -409,22 +405,20 @@ void position_from_marker(const geometry_msgs::PoseStamped::ConstPtr& msg)
 /* to prevent old marker values being stored when no marker detected*/
 void reset_marker_values()
 {
+    //ROS_INFO("resetting marker pose data");
 
-		//ROS_INFO("resetting marker pose data");
+    marker_detected = 0;
+    marker_x = 0;
+    marker_y = 0;
+    marker_z = 0;
 
-		marker_detected = 0;
-		marker_x = 0;
-		marker_y = 0;
-		marker_z = 0;
-		
-		marker_robot_y = 0;
-		marker_robot_x = 0;
-		
-		
-		roll_marker = 0;
-		pitch_marker = 0;
-		yaw_marker = 0;
-		
+    marker_robot_y = 0;
+    marker_robot_x = 0;
+
+
+    roll_marker = 0;
+    pitch_marker = 0;
+    yaw_marker = 0;
 
 }
 
@@ -444,14 +438,14 @@ void set_current_pose(const tf2_msgs::TFMessage::ConstPtr& _msg)
             current_robot_pose.orientation.y = _msg->transforms.at(i).transform.rotation.y;
             current_robot_pose.orientation.z = _msg->transforms.at(i).transform.rotation.z;
 			
-			//convert quaternion to euler
-			tf::Quaternion quat_goal;
-			tf::quaternionMsgToTF(current_robot_pose.orientation, quat_goal);
-			double roll, pitch, yaw;
-			tf::Matrix3x3(quat_goal).getRPY(roll, pitch, yaw);
-			
-			yaw_current_rad = yaw;
-			yaw_current_deg = yaw * R2Df;
+            //convert quaternion to euler
+            tf::Quaternion quat_goal;
+            tf::quaternionMsgToTF(current_robot_pose.orientation, quat_goal);
+            double roll, pitch, yaw;
+            tf::Matrix3x3(quat_goal).getRPY(roll, pitch, yaw);
+
+            yaw_current_rad = yaw;
+            yaw_current_deg = yaw * R2Df;
 	
             break;
         }
@@ -506,7 +500,7 @@ int main (int argc, char **argv)
     while(ros::ok())
     {
 		
-		ROS_INFO("rotation flag: %d, received path: %d, move flag: %d\n", initial_robot_rotation_flag, received_path, move_flag); 
+		//ROS_INFO("rotation flag: %d, received path: %d, move flag: %d\n", initial_robot_rotation_flag, received_path, move_flag); 
 
         
 		
@@ -556,10 +550,12 @@ int main (int argc, char **argv)
 				goal_motion.wheel[1] = 0; //moveY
 			
 				goal_motion.wheel[2] = yaw_goal_rad * R2Df;
-						
-				ROS_INFO("Rotation Motion x: %.3f, y: %.3f, theta: %.3f\n", goal_motion.wheel[0]  ,goal_motion.wheel[1] , goal_motion.wheel[2] ); 
+                                if(goal_motion.wheel[2] != 0.)
+                                {
+                                    ROS_INFO("Rotation Motion x: %.3f, y: %.3f, theta: %.3f\n", goal_motion.wheel[0]  ,goal_motion.wheel[1] , goal_motion.wheel[2] );
 
-				ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
+                                    ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
+                                }
 				
 				//send local goal 
 				goal_motion.type = 'W';
@@ -569,11 +565,13 @@ int main (int argc, char **argv)
 				goal_motion.wheel[1] = -temporary_goal_pose.position.x*sin(yaw_goal_rad) + temporary_goal_pose.position.y*cos(yaw_goal_rad);
 				goal_motion.wheel[2] = 0;
 				
-						
-				ROS_INFO("Translation Motion x: %.3f, y: %.3f, theta: %.3f\n", goal_motion.wheel[0]  ,goal_motion.wheel[1] , goal_motion.wheel[2] ); 
+                                if(goal_motion.wheel[0] != 0. || goal_motion.wheel[1] != 0.)
+                                {
+                                    ROS_INFO("Translation Motion x: %.3f, y: %.3f, theta: %.3f\n", goal_motion.wheel[0]  ,goal_motion.wheel[1] , goal_motion.wheel[2] );
 
-				ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
-				
+                                    ac_motion.sendGoalAndWait(goal_motion, ros::Duration(5));
+
+                                }
 				
 				if(use_aruco_marker == 1)
 				{
@@ -596,6 +594,7 @@ int main (int argc, char **argv)
 				ROS_INFO(" dummy state for updating marker flag");
 				ros::spinOnce(); //update marker flag
 				state_variable = 02;
+				usleep(1000* 2 * 1000); 
 				break;
 				
 			case(02):

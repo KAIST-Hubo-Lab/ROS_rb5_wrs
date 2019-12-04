@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
+#include <math.h>
 #include <chrono>
 #include <actionlib/server/simple_action_server.h>
 #include <tf/transform_broadcaster.h>
@@ -46,13 +47,26 @@ enum {
 ros::Publisher robot_states_pub;
 ros::Publisher marker_tf_pub;
 ros::Subscriber marker_tf_sub;
+ros::Subscriber marker1_tf_sub;
+ros::Subscriber marker2_tf_sub;
+ros::Subscriber marker3_tf_sub;
+ros::Subscriber marker4_tf_sub;
 ros::Subscriber shelf_marker_tf_sub;
 rb5_ros_wrapper::update message;
 
-float marker_x,marker_y,marker_z,marker_wx,marker_wy,marker_wz = 0.;
+float marker_x= 0.,marker_y= 0.,marker_z= 0.,marker_wx= 0.,marker_wy= 0.,marker_wz = 0.;
 float marker_w = 1.;
-float shelf_x,shelf_y,shelf_z,shelf_wx,shelf_wy,shelf_wz = 0.;
+float shelf_x= 0., shelf_y= 0.,shelf_z= 0.,shelf_wx= 0.,shelf_wy= 0.,shelf_wz = 0.;
 float shelf_w = 1.;
+
+float marker1_x= 0.,marker1_y= 0.,marker1_z= 0.,marker1_wx= 0.,marker1_wy= 0.,marker1_wz = 0.;
+float marker1_w = 1.;
+float marker2_x= 0.,marker2_y= 0.,marker2_z= 0.,marker2_wx= 0.,marker2_wy= 0.,marker2_wz = 0.;
+float marker2_w = 1.;
+float marker3_x= 0.,marker3_y= 0.,marker3_z= 0.,marker3_wx= 0.,marker3_wy= 0.,marker3_wz = 0.;
+float marker3_w = 1.;
+float marker4_x= 0.,marker4_y= 0.,marker4_z= 0.,marker4_wx= 0.,marker4_wy= 0.,marker4_wz = 0.;
+float marker4_w = 1.;
 
 bool connectROS()
 {
@@ -107,7 +121,6 @@ bool connectRST()
     printf("\n Client connected to server!(RST)\n");
     return true;
 }
-
 
 class MotionAction
 {
@@ -304,6 +317,9 @@ public:
 
 void markerCallback(const wrs_fsm::tf_broadcastPtr& msg)
 {
+    if(msg->w == 0)
+        return;
+
     marker_x = msg->x ;
     marker_y = msg->y ;
     marker_z = msg->z ;
@@ -313,8 +329,67 @@ void markerCallback(const wrs_fsm::tf_broadcastPtr& msg)
     marker_wz= msg->wz;
 }
 
+void marker1Callback(const wrs_fsm::tf_broadcastPtr& msg)
+{
+    if(msg->w == 0)
+        return;
+
+    marker1_x = msg->x ;
+    marker1_y = msg->y ;
+    marker1_z = msg->z ;
+    marker1_w = msg->w ;
+    marker1_wx= msg->wx;
+    marker1_wy= msg->wy;
+    marker1_wz= msg->wz;
+}
+
+void marker2Callback(const wrs_fsm::tf_broadcastPtr& msg)
+{
+    if(msg->w == 0)
+        return;
+
+    marker2_x = msg->x ;
+    marker2_y = msg->y ;
+    marker2_z = msg->z ;
+    marker2_w = msg->w ;
+    marker2_wx= msg->wx;
+    marker2_wy= msg->wy;
+    marker2_wz= msg->wz;
+}
+
+void marker3Callback(const wrs_fsm::tf_broadcastPtr& msg)
+{
+    if(msg->w == 0)
+        return;
+
+    marker3_x = msg->x ;
+    marker3_y = msg->y ;
+    marker3_z = msg->z ;
+    marker3_w = msg->w ;
+    marker3_wx= msg->wx;
+    marker3_wy= msg->wy;
+    marker3_wz= msg->wz;
+}
+
+void marker4Callback(const wrs_fsm::tf_broadcastPtr& msg)
+{
+    if(msg->w == 0)
+        return;
+
+    marker4_x = msg->x ;
+    marker4_y = msg->y ;
+    marker4_z = msg->z ;
+    marker4_w = msg->w ;
+    marker4_wx= msg->wx;
+    marker4_wy= msg->wy;
+    marker4_wz= msg->wz;
+}
+
 void shelfCallback(const wrs_fsm::tf_broadcastPtr& msg)
 {
+    if(msg->w == 0)
+        return;
+
     shelf_x = msg->x ;
     shelf_y = msg->y ;
     shelf_z = msg->z ;
@@ -330,12 +405,17 @@ int main(int argc, char *argv[])
     ros::init(argc, argv, "rb5_ros_wrapper");
 
     ros::NodeHandle n;
-    robot_states_pub = n.advertise<wrs_fsm::tf_broadcast>("robot_states",1);
+    robot_states_pub = n.advertise<rb5_ros_wrapper::update>("/robot_states",1);
     marker_tf_sub = n.subscribe("/marker_tf", 10, &markerCallback);
+    marker1_tf_sub = n.subscribe("/marker1_tf", 10, &marker1Callback);
+    marker2_tf_sub = n.subscribe("/marker2_tf", 10, &marker2Callback);
+    marker3_tf_sub = n.subscribe("/marker3_tf", 10, &marker3Callback);
+    marker4_tf_sub = n.subscribe("/marker4_tf", 10, &marker4Callback);
     shelf_marker_tf_sub = n.subscribe("/shelf_marker_tf", 10, &shelfCallback);
 
     tf::TransformBroadcaster br;
-    tf::Transform Trb5_wrist, Trb5_base, Trb5_gripper, Trb5_suction, Trb5_camera, Trb5_marker;
+    tf::Transform Trb5_wrist, Trb5_base, Trb5_gripper, Trb5_suction, Trb5_camera, Trb5_marker, Trb5_shelf;
+    tf::Transform Trb5_marker1, Trb5_marker2, Trb5_marker3, Trb5_marker4;
     tf::Quaternion tempq;
 
 
@@ -402,16 +482,34 @@ int main(int argc, char *argv[])
         Trb5_marker.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_marker, ros::Time::now(), "/camera1", "/marker1"));
 
-        Trb5_marker.setOrigin(tf::Vector3(shelf_x,shelf_y,shelf_z));
+        Trb5_shelf.setOrigin(tf::Vector3(shelf_x,shelf_y,shelf_z));
         tempq = tf::Quaternion(shelf_wx,shelf_wy,shelf_wz,shelf_w);
-        Trb5_marker.setRotation(tempq);
-        br.sendTransform(tf::StampedTransform(Trb5_marker, ros::Time::now(), "/camera1", "/shelf"));
+        Trb5_shelf.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_shelf, ros::Time::now(), "/camera1", "/shelf"));
 
-//        tf::Matrix3x3 markerYPR = Trb5_marker.getBasis();
-//        tf::Vector3 markerXYZ = Trb5_marker.getOrigin();
-//        double mr,mp,my;
-//        markerYPR.getEulerYPR(my,mp,mr);
-//        printf("pos = %f, %f, %f, %f, %f, %f\n",markerXYZ.x(),markerXYZ.y(),markerXYZ.z(),mr*R2D,mp*R2D,my*R2D);
+
+        Trb5_marker1.setOrigin(tf::Vector3(marker1_x,marker1_y,marker1_z));
+        tempq = tf::Quaternion(marker1_wx,marker1_wy,marker1_wz,marker1_w);
+        Trb5_marker1.setRotation(tempq);
+        br.sendTransform(tf::StampedTransform(Trb5_marker1, ros::Time::now(), "/camera1", "/marker11"));
+
+
+//        Trb5_marker2.setOrigin(tf::Vector3(marker2_x,marker2_y,marker2_z));
+//        tempq = tf::Quaternion(marker2_wx,marker2_wy,marker2_wz,marker2_w);
+//        Trb5_marker2.setRotation(tempq);
+//        br.sendTransform(tf::StampedTransform(Trb5_marker2, ros::Time::now(), "/camera1", "/marker2"));
+
+
+//        Trb5_marker3.setOrigin(tf::Vector3(marker3_x,marker3_y,marker3_z));
+//        tempq = tf::Quaternion(marker3_wx,marker3_wy,marker3_wz,marker3_w);
+//        Trb5_marker3.setRotation(tempq);
+//        br.sendTransform(tf::StampedTransform(Trb5_marker3, ros::Time::now(), "/camera1", "/marker3"));
+
+
+//        Trb5_marker4.setOrigin(tf::Vector3(marker4_x,marker4_y,marker4_z));
+//        tempq = tf::Quaternion(marker4_wx,marker4_wy,marker4_wz,marker4_w);
+//        Trb5_marker4.setRotation(tempq);
+//        br.sendTransform(tf::StampedTransform(Trb5_marker4, ros::Time::now(), "/camera1", "/marker4"));
 
         for(int i=0;i<6;i++)
         {

@@ -4,6 +4,7 @@ int32 object_id  #0:kimbap1 1:kimbap2 2:sanwich 3:hambug_thin 4:hambug_fat 5:cof
 int32 tool_id    #0:gripper 1:suction
 int32 shelf_id   #1,2,3 floor
 int32 sub_cmd    #sub cmd..
+int32 object_state #0:idle 1:side 2:back 3:front
 float64 pose_x
 float64 pose_y
 float64 pose_z
