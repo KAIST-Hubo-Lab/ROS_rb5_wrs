@@ -30,27 +30,20 @@ public:
         float   tcp_position[6];
 
         float   tool_reference;         //reference voltage of tool flalnge board [0, 12, 24]
-
     };
-
-    Update message;
+    struct Result
+    {
+        int     rb5_result;
+        int     wheel_result;
+    };
+    struct RB5toROS
+    {
+        Update message;
+        Result result;
+    };
+    RB5toROS podo2ros;
+//    Update message;
 };
 
-class RESULT
-{
-public:
-    RESULT();
-    ~RESULT();
-    int size;
-    int sock;
-    char *buffer;
-
-    struct Result{
-        int     rb5result;
-        int     wheelresult;
-    };
-
-    Result message;
-};
 
 #endif // LANPODO2ROS_H

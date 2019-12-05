@@ -54,9 +54,11 @@ public:
         ROS_INFO("Setting to real mode.");
         Sendcommand(CMD_ChangeMode,0,0,1,0,0, 0, 0, 0, 0,0,0);
 
-        //change speed 30%
+        //change speed 50%
         ChangeSpeed(0.5);
-        goHome();
+        goHome(IDLEPOSE);
+        usleep(5000*1000);
+        goHome(IDLEPOSE);
     }
 
     void doneCb(const actionlib::SimpleClientGoalState& state,
@@ -73,6 +75,11 @@ public:
         case ERROR_STOP:
             ROS_ERROR("Action Server send rb5 ERROR");
             MotionDone = result->rb5result;
+            break;
+        case EXT_COLLISION:
+            ROS_ERROR("EXT COLLISION!!!!");
+            Sendcommand(CMD_MotionHalt,0,0,0,0,0,0,0,0,0,0,0);
+//            MotionDone = result->rb5result;
             break;
         }
 
@@ -112,6 +119,38 @@ public:
         rb5_goal.acc = acc;
         SendGoalandWait();
     }
+    void Sendcommand(char type, int d0, int d1, float data, float coordinate0, float coordinate1, float coordinate2, float coordinate3, float coordinate4, float coordinate5, const float spd[])
+    {
+        rb5_goal.type = type;
+        rb5_goal.d0 = d0;
+        rb5_goal.d1 = d1;
+        rb5_goal.data = data;
+        rb5_goal.coordinate[0] = coordinate0;
+        rb5_goal.coordinate[1] = coordinate1;
+        rb5_goal.coordinate[2] = coordinate2;
+        rb5_goal.coordinate[3] = coordinate3;
+        rb5_goal.coordinate[4] = coordinate4;
+        rb5_goal.coordinate[5] = coordinate5;
+        rb5_goal.spd = spd[0];
+        rb5_goal.acc = spd[1];
+        SendGoalandWait();
+    }
+    void Sendcommand(char type, Pose _pose,  const float spd[])
+    {
+        rb5_goal.type = type;
+        rb5_goal.d0   = 0;
+        rb5_goal.d1   = 0;
+        rb5_goal.data = 0;
+        rb5_goal.coordinate[0] = _pose.cdn[0];
+        rb5_goal.coordinate[1] = _pose.cdn[1];
+        rb5_goal.coordinate[2] = _pose.cdn[2];
+        rb5_goal.coordinate[3] = _pose.cdn[3];
+        rb5_goal.coordinate[4] = _pose.cdn[4];
+        rb5_goal.coordinate[5] = _pose.cdn[5];
+        rb5_goal.spd = spd[0];
+        rb5_goal.acc = spd[1];
+        SendGoalandWait();
+    }
     void Sendcommandwheel(char type, int d0, int d1, float x_m, float y_m, float yaw_deg)
     {
         rb5_goal.type = type;
@@ -132,9 +171,8 @@ public:
     }
     int sendMotion(Motion _curMotion);
 
-    void goHome();
+    void goHome(int _curPose);
     void goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal);
-    void goSearchBasket(const rb5_ros_wrapper::manipulationGoalConstPtr _goal);
     void goGrasp(const rb5_ros_wrapper::manipulationGoalConstPtr _goal);
     void goPut(const rb5_ros_wrapper::manipulationGoalConstPtr _goal, Pose _pose);
 
@@ -379,7 +417,7 @@ public:
                 ROS_ERROR("Marker z is changed %f to %f",temp.z(),shelf_marker[BACK1].z);
                 new_z = shelf_marker[BACK1].z;
             }
-            Sendcommand(CMD_MoveTCP,0,0,0,0,-400,0,90,0,0,spd_fast[0],spd_fast[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,0,-400,0,90,0,0,spd_fast);
             break;
         case SHELF2:
             if(fabs(temp.y()-shelf_marker[BACK2].y) > limit_marker_offset_b)
@@ -418,7 +456,7 @@ public:
         ROS_INFO("-----------------------------------------------");
         ROS_INFO("\n");
 
-        Sendcommand(CMD_MoveJoint,0,0,0,jshelfinit[0],jshelfinit[1],jshelfinit[2],jshelfinit[3],jshelfinit[4],jshelfinit[5],spd_fast[0], spd_fast[1]);
+        Sendcommand(CMD_MoveJoint,home_pose[JDEFAULTHOME],spd_fast);
         MotionDone = DONE;
     }
 
@@ -466,11 +504,11 @@ int GraspAction::sendMotion(Motion _curMotion)
     {
     case 'J':
         ROS_INFO("Move Joint : %f, %f, %f, %f, %f, %f, %f, %f",_curMotion.coordinate[0],_curMotion.coordinate[1],_curMotion.coordinate[2],_curMotion.coordinate[3],_curMotion.coordinate[4],_curMotion.coordinate[5],_curMotion.spd,_curMotion.acc);
-        Sendcommand(CMD_MoveJoint, 0, 0, 0, _curMotion.coordinate[0],_curMotion.coordinate[1],_curMotion.coordinate[2],_curMotion.coordinate[3],_curMotion.coordinate[4],_curMotion.coordinate[5],_curMotion.spd,_curMotion.acc);
+        Sendcommand(CMD_MoveJoint, 0, 0, 0, _curMotion.coordinate[0],_curMotion.coordinate[1],_curMotion.coordinate[2],_curMotion.coordinate[3],_curMotion.coordinate[4],_curMotion.coordinate[5],_curMotion.spd, _curMotion.acc);
         break;
     case 'T':
         ROS_INFO("Move TCP : %f, %f, %f, %f, %f, %f, %f, %f",_curMotion.coordinate[0],_curMotion.coordinate[1],_curMotion.coordinate[2],_curMotion.coordinate[3],_curMotion.coordinate[4],_curMotion.coordinate[5],_curMotion.spd,_curMotion.acc);
-        Sendcommand(CMD_MoveTCP, 0, 0, 0, _curMotion.coordinate[0],_curMotion.coordinate[1],_curMotion.coordinate[2],_curMotion.coordinate[3],_curMotion.coordinate[4],_curMotion.coordinate[5],_curMotion.spd,_curMotion.acc);
+        Sendcommand(CMD_MoveTCP, 0, 0, 0, _curMotion.coordinate[0],_curMotion.coordinate[1],_curMotion.coordinate[2],_curMotion.coordinate[3],_curMotion.coordinate[4],_curMotion.coordinate[5],_curMotion.spd, _curMotion.acc);
         break;
     case 'E':
         return 0;
@@ -502,13 +540,27 @@ void GraspAction::closeGripper(int _msec)
     usleep(500*1000);
 }
 
-void GraspAction::goHome()
+void GraspAction::goHome(int _curPose)
 {
-    ROS_INFO("Going home.\n");
-    Sendcommand(CMD_MoveJoint,0,0,0,jshelfinit[0],jshelfinit[1],jshelfinit[2],jshelfinit[3],jshelfinit[4],jshelfinit[5],spd_fast[0], spd_fast[1]);
+    switch(_curPose)
+    {
+    case SHELF1:
+        ROS_INFO("Going home : SHELF1");
+        Sendcommand(CMD_MoveJoint,home_pose[TSHELF1HOME],spd_fast);
+//        closeGripper();
+        break;
+    case BASKET:
+        ROS_INFO("Going home : BASKET");
+        Sendcommand(CMD_MoveJoint,home_pose[JBASKETHOME],spd_fast);
+//        closeGripper();
+        break;
+    default:
+        ROS_INFO("Going home : DEFAULT");
+        Sendcommand(CMD_MoveJoint,home_pose[JDEFAULTHOME],spd_fast);
+//        closeGripper();
 
-    closeGripper();
-
+        break;
+    }
     MotionDone = DONE;
 }
 
@@ -519,7 +571,7 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
 
     int _shelf = _goal->shelf_id;
     int _id = _goal->object_id;
-    Sendcommand(CMD_MoveJoint, 0,0,0,jshelfinit[0],jshelfinit[1],jshelfinit[2],jshelfinit[3],jshelfinit[4],jshelfinit[5],spd_fast[0], spd_fast[1]);
+    Sendcommand(CMD_MoveJoint,home_pose[JDEFAULTHOME],spd_fast);
 
     char *object_name;
     switch(_shelf)
@@ -532,18 +584,18 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
             switch(_goal->sub_cmd)
             {
             case 0:
-                Sendcommand(CMD_MoveJoint,0,0,0,-45.34, 43.01, 127.3, -80.31, 90., -44.67, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-45.34, 43.01, 127.3, -80.31, 90., -44.67, spd_fast);
                 break;
             case 1:
-                Sendcommand(CMD_MoveJoint,0,0,0,-47.01, 27.97, 125.65, -63.63, 90.00, -43., spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-47.01, 27.97, 125.65, -63.63, 90.00, -43., spd_fast);
                 break;
             case 2:
-                Sendcommand(CMD_MoveJoint,0,0,0,-22.15, -13.82, 103.18, -12.09, 58.61, -98.12, spd_fast[0], spd_fast[1]);
-                Sendcommand(CMD_MoveJoint,0,0,0,-7.45, 93.85, 36.74, 2.87, 62.24, -153.78, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-22.15, -13.82, 103.18, -12.09, 58.61, -98.12, spd_fast);
+                Sendcommand(CMD_MoveJoint,0,0,0,-7.45, 93.85, 36.74, 2.87, 62.24, -153.78, spd_fast);
                 break;
             case 3:
-                Sendcommand(CMD_MoveJoint,0,0,0,-99.35, 29.61, 137.15, -87.09, 85.72, 67.73, spd_fast[0], spd_fast[1]);
-                Sendcommand(CMD_MoveJoint,0,0,0,-110.21, 78.31, 113.92, -102.05, 130.0, 90.26, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-99.35, 29.61, 137.15, -87.09, 85.72, 67.73, spd_fast);
+                Sendcommand(CMD_MoveJoint,0,0,0,-110.21, 78.31, 113.92, -102.05, 130.0, 90.26, spd_fast);
                 break;
             default:
                 printf("no search pose %d\n",_goal->sub_cmd);
@@ -556,10 +608,10 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
             switch(_goal->sub_cmd)
             {
             case 0:
-                Sendcommand(CMD_MoveJoint,0,0,0,-99.66, 42.1, 133.78, -85.88, 90.0, 9.65, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-99.66, 42.1, 133.78, -85.88, 90.0, 9.65, spd_fast);
                 break;
             case 1:
-                Sendcommand(CMD_MoveJoint,0,0,0,-99.66, 23.65, 135.01, -68.66, 90., 9.65, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-99.66, 23.65, 135.01, -68.66, 90., 9.65, spd_fast);
                 break;
             default:
                 printf("no search pose %d\n",_goal->sub_cmd);
@@ -576,16 +628,16 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
             switch(_goal->sub_cmd)
             {
             case 0:
-                Sendcommand(CMD_MoveJoint,0,0,0,28.52, -34.02, 136.95, 19.68, 55.77, -124.67, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,28.52, -34.02, 136.95, 19.68, 55.77, -124.67, spd_fast);
                 break;
             case 1:
-                Sendcommand(CMD_MoveJoint,0,0,0,-87.42, -11.6, 155.93, -90.67, 129.7, 202.57, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-87.42, -11.6, 155.93, -90.67, 129.7, 202.57, spd_fast);
                 break;
             case 2:
-                Sendcommand(CMD_MoveJoint,0,0,0,8.36, 22.43, 100.62, 20.39, 48.12, 41.99, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,8.36, 22.43, 100.62, 20.39, 48.12, 41.99, spd_fast);
                 break;
             case 3:
-                Sendcommand(CMD_MoveJoint,0,0,0,-20.27, 66.84, 34.09, 55.93, 55.58, 10.23, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-20.27, 66.84, 34.09, 55.93, 55.58, 10.23, spd_fast);
                 break;
             default:
                 printf("no search pose %d\n",_goal->sub_cmd);
@@ -597,16 +649,16 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
             switch(_goal->sub_cmd)
             {
             case 0:
-                Sendcommand(CMD_MoveJoint,0,0,0,-114.73, -35.91, 137.48, -32.42, 99.32, 23.01, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-114.73, -35.91, 137.48, -32.42, 99.32, 23.01, spd_fast);
                 break;
             case 1:
-                Sendcommand(CMD_MoveJoint,0,0,0,-151.92, 29.43, 93.85, -9.3, 135.3, 122.04, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-151.92, 29.43, 93.85, -9.3, 135.3, 122.04, spd_fast);
                 break;
             case 2:
-                Sendcommand(CMD_MoveJoint,0,0,0,-47.39, 12.89, 102.5, 20.35, 53.52, 16.53, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-47.39, 12.89, 102.5, 20.35, 53.52, 16.53, spd_fast);
                 break;
             case 3:
-                Sendcommand(CMD_MoveJoint,0,0,0,-20.27, 66.84, 34.09, 55.93, 55.58, 10.23, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-20.27, 66.84, 34.09, 55.93, 55.58, 10.23, spd_fast);
                 break;
             default:
                 printf("no search pose %d\n",_goal->sub_cmd);
@@ -623,16 +675,16 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
             switch(_goal->sub_cmd)
             {
             case 0:
-                Sendcommand(CMD_MoveJoint,0,0,0,-121.11, -12.38, 100.23, -0.08, 138.88, 96.48, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-121.11, -12.38, 100.23, -0.08, 138.88, 96.48, spd_fast);
                 break;
             case 1:
-                Sendcommand(CMD_MoveJoint,0,0,0,-18.58, 47.75, 57.42, -137.58, -58.38, 8.17, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-18.58, 47.75, 57.42, -137.58, -58.38, 8.17, spd_fast);
                 break;
             case 2:
-                Sendcommand(CMD_MoveJoint,0,0,0, -138.89, 28.32, 67., 36.06, 142.46, 138.52, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0, -138.89, 28.32, 67., 36.06, 142.46, 138.52, spd_fast);
                 break;
             case 3:
-                Sendcommand(CMD_MoveJoint,0,0,0, 34.94, -47.04, 118.19, 62.98, 55.26, -141.9, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0, 34.94, -47.04, 118.19, 62.98, 55.26, -141.9, spd_fast);
                 break;
             default:
                 printf("no search pose %d\n",_goal->sub_cmd);
@@ -644,14 +696,14 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
             switch(_goal->sub_cmd)
             {
             case 0:
-                Sendcommand(CMD_MoveJoint,0,0,0,-127.16, -8.17, 93.33, 3.92, 118.06, 95.88, spd_fast[0], spd_fast[1]);
-                Sendcommand(CMD_MoveJoint,0,0,0,-145.87, 20.53, 78.59, 30.96, 143.31, 136.89, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-127.16, -8.17, 93.33, 3.92, 118.06, 95.88, spd_fast);
+                Sendcommand(CMD_MoveJoint,0,0,0,-145.87, 20.53, 78.59, 30.96, 143.31, 136.89, spd_fast);
                 break;
             case 1:
-                Sendcommand(CMD_MoveJoint,0,0,0,-27.89, 18.5, 93.73, -150.46, -53.9, 24.92, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-27.89, 18.5, 93.73, -150.46, -53.9, 24.92, spd_fast);
                 break;
             case 2:
-                Sendcommand(CMD_MoveJoint,0,0,0,-126.48, -34.46, 98.08, 159.93, -112.1, -154.93, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-126.48, -34.46, 98.08, 159.93, -112.1, -154.93, spd_fast);
                 break;
             default:
                 printf("no search pose %d\n",_goal->sub_cmd);
@@ -662,33 +714,33 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
     }
     case BASKET:
     {
-        Sendcommand(CMD_MoveJoint, 0,0,0,jshelfinit[0],jshelfinit[1],jshelfinit[2],jshelfinit[3],jshelfinit[4],jshelfinit[5],spd_fast[0], spd_fast[1]);
+        Sendcommand(CMD_MoveJoint,home_pose[JDEFAULTHOME],spd_fast);
 
         switch(_goal->object_id)
         {
         case KIMBAP1:
             object_name = "kimbap1 (basket)";
-            Sendcommand(CMD_MoveJoint, 0, 0, 0, -215.63, 10.25, 92.10, 31.74, 63.51, -155.26, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint, 0, 0, 0, -213.88, 44.03, 81.54, 19.62, 61.15, -161.44, spd_fast);
             break;
         case KIMBAP2:
             object_name = "kimbap2 (basket)";
-            Sendcommand(CMD_MoveJoint, 0, 0, 0, -215.63, 10.25, 92.10, 31.74, 63.51, -155.26, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint, 0, 0, 0, -213.88, 44.03, 81.54, 19.62, 61.15, -161.44, spd_fast);
             break;
         case SANDWICH:
             object_name = "sandwich (basket)";
-            Sendcommand(CMD_MoveJoint, 0, 0, 0, 22.33, -34.53, 120.48, -10.85, 122.06, 63.37, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint, 0, 0, 0, -211.24, 49.43, 70.97, 25.6, 63.32, -163.12, spd_fast);
             break;
         case HAMBUG:
             object_name = "hambug (basket)";
-            Sendcommand(CMD_MoveJoint, 0, 0, 0, 22.33, -34.53, 120.48, -10.85, 122.06, 63.37, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint, 0, 0, 0, -211.24, 49.43, 70.97, 25.6, 63.32, -163.12, spd_fast);
             break;
         case COFFEE:
             object_name = "coffee (basket)";
-            Sendcommand(CMD_MoveJoint, 0, 0, 0, 72.29, -26.4, 113.06, -6.19, 93.04, 17.45, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint, 0, 0, 0, 82.87, 18.91, 106.7, -35.61, 90.01, 7.12, spd_fast);
             break;
         case LUNCHBOX:
             object_name = "lunchbox (basket)";
-            Sendcommand(CMD_MoveJoint, 0, 0, 0, 59.94, -18.32, 108.07, -8.43, 94.99, 29.67, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint, 0, 0, 0, 80.34, 1.63, 128.19, -39.81, 90.01, 9.65, spd_fast);
             break;
         default:
             return;
@@ -698,7 +750,7 @@ void GraspAction::goSearch(const rb5_ros_wrapper::manipulationGoalConstPtr _goal
     case TEMP:
     {
         object_name = "old lunchbox";
-        Sendcommand(CMD_MoveJoint , 0, 0, 0, 33.59, -21.43, 107.38, 4.05, 90.01, -213.59, spd_fast[0], spd_fast[1]);
+        Sendcommand(CMD_MoveJoint , search_pose[TEMP_LUNCHBOX], spd_fast);
         break;
     }
     }
@@ -858,7 +910,7 @@ void GraspAction::goGrasp(const rb5_ros_wrapper::manipulationGoalConstPtr _goal)
     ROS_INFO("GRASP::Approach pose1");
     PrintCoordinate("Approach",x_real,y_real,z_real,r_real,p_real,oy_real);
 
-    Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_fast[0], spd_fast[1]);
+    Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_fast);
 
 
     ROS_INFO("GRASP::Approach pose2");
@@ -868,12 +920,12 @@ void GraspAction::goGrasp(const rb5_ros_wrapper::manipulationGoalConstPtr _goal)
     //--------------------------------------Suction-------------------------------------//
     if(tool == TOOLMODE_GRIPPER)
     {
-        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach[0], spd_approach[1]);
+        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach);
         ROS_INFO("GRASP::Close Gripper");
         closeGripper();
     }else if(tool == TOOLMODE_SUCTION)
     {
-        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction[0], spd_approach_suction[1]);
+        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction);
         ROS_INFO("GRASP::Suction");
         suction(0);
         suction(1);
@@ -883,7 +935,7 @@ void GraspAction::goGrasp(const rb5_ros_wrapper::manipulationGoalConstPtr _goal)
     ROS_INFO("GRASP::Lift");
     z_real += (Info_Object[_id].z_lift + basket_z_lift)*1000;
     PrintCoordinate("Lift",x_real,y_real,z_real,r_real,p_real,oy_real);
-    Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_lift[0], spd_lift[1]);
+    Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_lift);
 
     if(_shelf == BASKET)
     {
@@ -891,22 +943,22 @@ void GraspAction::goGrasp(const rb5_ros_wrapper::manipulationGoalConstPtr _goal)
         {
         case KIMBAP1:
         case KIMBAP2:
-            Sendcommand(CMD_MoveJoint,0,0,0,-75.81, -3.24, 66.13, 27.11, 90.01, -14.19, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint,via_point[JBASKETTO3],spd_fast);
             break;
         case SANDWICH:
         case HAMBUG:
         case COFFEE:
         case LUNCHBOX:
-            Sendcommand(CMD_MoveJoint,0,0,0,-75.81, -9.09, 98.56, 0.52, 90.01, -14.19, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint,via_point[JBASKETTO12],spd_fast);
             break;
         default:
             return;
         }
     }else if(_shelf == TEMP)
     {
-        Sendcommand(CMD_MoveJoint,0,0,0,-67.44, -12.89, 103.72, -7.82, 88.17, -20.38, spd_fast[0], spd_fast[1]);
+        Sendcommand(CMD_MoveJoint,via_point[JTEMPTOSHELF],spd_fast);
     }
-    ROS_INFO("GRASP::Completed ;D\n\n");
+    ROS_INFO("GRASP::Completed ;D\n");
     MotionDone = DONE;
 }
 
@@ -924,31 +976,21 @@ void GraspAction::goPut(const rb5_ros_wrapper::manipulationGoalConstPtr _goal, P
     {
         if(_goal->object_id == LUNCHBOX)
         {
-            Sendcommand(CMD_MoveTCP,0,0,0, tdispose_lunchbox[0],tdispose_lunchbox[1],tdispose_lunchbox[2],tdispose_lunchbox[3],tdispose_lunchbox[4],tdispose_lunchbox[5], spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveTCP,via_point[TLUNCHBOX_VIA1],spd_fast);
         }
-        Sendcommand(CMD_MoveJoint,0,0,0, jdispose1[0],jdispose1[1],jdispose1[2],jdispose1[3],jdispose1[4],jdispose1[5], spd_fast[0], spd_fast[1]);
-        Sendcommand(CMD_MoveJoint,0,0,0, jdispose2[0],jdispose2[1],jdispose2[2],jdispose2[3],jdispose2[4],jdispose2[5], spd_fast[0], spd_fast[1]);
+        Sendcommand(CMD_MoveJoint,via_point[JDISPOSE_VIA1],spd_fast);
+        Sendcommand(CMD_MoveJoint,via_point[JDISPOSE],spd_fast);
         break;
     }
     case LUNCHBOX_PUT:
     {
         if(_goal->object_id == LUNCHBOX)
         {
-            Sendcommand(CMD_MoveTCP,0,0,0, tdispose_lunchbox[0],tdispose_lunchbox[1],tdispose_lunchbox[2],tdispose_lunchbox[3],tdispose_lunchbox[4],tdispose_lunchbox[5], spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveTCP,via_point[TLUNCHBOX_VIA1],spd_fast);
         }
-        Sendcommand(CMD_MoveJoint,0,0,0, jlunchbox1[0],jlunchbox1[1],jlunchbox1[2],jlunchbox1[3],jlunchbox1[4],jlunchbox1[5], spd_fast[0], spd_fast[1]);
-        Sendcommand(CMD_MoveJoint,0,0,0, jlunchbox2[0],jlunchbox2[1],jlunchbox2[2],jlunchbox2[3],jlunchbox2[4],jlunchbox2[5], spd_fast[0], spd_fast[1]);
+//        Sendcommand(CMD_MoveJoint,via_point[JLUNCHBOX_VIA2],spd_fast);
+        Sendcommand(CMD_MoveJoint,via_point[JLUNCHBOX_PUT],spd_fast);
 
-        Pose put_lunchbox;
-        put_lunchbox.cdn[0] = 250;
-        put_lunchbox.cdn[1] = 0.;
-        put_lunchbox.cdn[2] = Info_Object[_goal->object_id].height*1000 + 30;
-        put_lunchbox.cdn[3] = 90.;
-        put_lunchbox.cdn[4] = 0.;
-        put_lunchbox.cdn[5] = 0.;
-        TCPtoRB5(put_lunchbox, TOOLMODE_SUCTION);
-        PrintCoordinate("Lunchbox put",x_real,y_real,z_real,r_real,p_real,oy_real);
-        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_put[0], spd_put[1]);
         break;
     }
     case LINE1:
@@ -960,27 +1002,27 @@ void GraspAction::goPut(const rb5_ros_wrapper::manipulationGoalConstPtr _goal, P
         _pose.cdn[2] += Info_Object[_goal->object_id].z_lift*1000;
         TCPtoRB5(_pose, tool);
         PrintCoordinate("Put 1",x_real,y_real,z_real,r_real,p_real,oy_real);
-        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_put[0], spd_put[1]);
+        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_lift);
 
 
         /* pos_x, pos_y - 0.03, pos_z + 0.02(only suction) */
         _pose.cdn[2] -= (Info_Object[_goal->object_id].z_lift - z_put_offset[tool])*1000;
         TCPtoRB5(_pose, tool);
         PrintCoordinate("Put 2",x_real,y_real,z_real,r_real,p_real,oy_real);
-        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_approach[0], spd_approach[1]);
+        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_approach);
 
 
         if(_goal->object_id == LUNCHBOX && _goal->sub_cmd == LINE2)
         {//no over pull
             y_real += y_put_object*1000;
             PrintCoordinate("Put 3",x_real,y_real,z_real,r_real,p_real,oy_real);
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction[0], spd_approach_suction[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction);
         }else
         {
             /* pull object over 1cm */
             y_real += y_pull_object*1000;
             PrintCoordinate("Put 3",x_real,y_real,z_real,r_real,p_real,oy_real);
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction[0], spd_approach_suction[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction);
         }
         break;
     }
@@ -988,7 +1030,7 @@ void GraspAction::goPut(const rb5_ros_wrapper::manipulationGoalConstPtr _goal, P
 
     if(tool == TOOLMODE_GRIPPER)
     {
-        openGripper(160);
+        openGripper(100);
     }else
     {
         suction(2);
@@ -999,23 +1041,22 @@ void GraspAction::goPut(const rb5_ros_wrapper::manipulationGoalConstPtr _goal, P
     case DISPOSE:
         break;
     case LUNCHBOX_PUT:
-        z_real += Info_Object[_goal->object_id].z_lift*1000;
-        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_fast[0], spd_fast[1]);
+        Sendcommand(CMD_MoveTCP,via_point[TLUNCHBOX_PUT_LIFT], spd_fast);
         break;
     default:
         z_real += Info_Object[_goal->object_id].z_lift*1000;
-        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_fast[0], spd_fast[1]);
+        Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_fast);
 
-        if(_goal->shelf_id == SHELF1)
-        {
-            Sendcommand(CMD_MoveTCP,0,0,0, tdispose_lunchbox[0],tdispose_lunchbox[1],tdispose_lunchbox[2],tdispose_lunchbox[3],tdispose_lunchbox[4],tdispose_lunchbox[5], spd_fast[0], spd_fast[1]);
-        }
+//        if(_goal->shelf_id == SHELF1)
+//        {
+//            Sendcommand(CMD_MoveTCP,via_point[TLUNCHBOX_VIA1],spd_fast);
+//        }
         break;
 
     }
 
     ROS_INFO("GRASP::Put Completed ;D\n\n");
-    goHome();
+    goHome(IDLEPOSE);
 }
 
 void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goal)
@@ -1098,7 +1139,7 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
                 ROS_ERROR("Marker z is changed %f to %f",temp.z(),shelf_marker[FRONT1].z);
                 new_z = shelf_marker[FRONT1].z;
             }
-            Sendcommand(CMD_MoveTCP,0,0,0,0,-400,0,90,0,0,spd_fast[0],spd_fast[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,0,-400,0,90,0,0,spd_fast);
             break;
         case SHELF2:
             if(fabs(temp.y()-shelf_marker[FRONT2].y) > limit_marker_offset_f)
@@ -1109,7 +1150,7 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
             if(fabs(temp.z()-shelf_marker[FRONT2].z) > limit_marker_offset_z)
             {
                 ROS_ERROR("Marker z is changed %f to %f",temp.z(),shelf_marker[FRONT2].z);
-                //new_z = shelf_marker[FRONT2].z;
+                new_z = shelf_marker[FRONT2].z;
             }
             break;
         case SHELF3:
@@ -1121,7 +1162,7 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
             if(fabs(temp.z()-shelf_marker[FRONT3].z) > limit_marker_offset_z)
             {
                 ROS_ERROR("Marker z is changed %f to %f",temp.z(),shelf_marker[FRONT3].z);
-                //new_z = shelf_marker[FRONT3].z;
+                new_z = shelf_marker[FRONT3].z;
             }
             break;
         default:
@@ -1133,8 +1174,6 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
         transform_shelf.setOrigin(Pshelf);
         ROS_INFO("-----------------------------------------------");
         ROS_INFO("\n");
-
-
 
 
 
@@ -1151,21 +1190,29 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
         {
             openGripper();
             TCPtoRB5(TOOLMODE_GALGORI);
-            Sendcommand(CMD_MoveJoint,0,0,0,-60, 77.8, 120.82, -108.59, 89.94, -30.24, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveJoint,0,0,0,-60, 77.8, 120.82, -108.59, 89.94, -30.24, spd_fast);
 
             Sendcommandwheel('W', 0, 1, 0.3, 0, 0);
 
-            Sendcommand(CMD_MoveTCP,0,0,0,0,-550, -330, 90, 0, 90, spd_fast[0], spd_fast[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,0,-550, -330, 90, 0, 90, spd_fast);
 
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real+20,90,0,90,spd_approach[0], spd_approach[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real+20,90,0,90,spd_approach);
 
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,90,0,90,spd_approach[0], spd_approach[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,90,0,90,spd_approach);
 
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real+400,z_real,90,0,90,spd_approach[0], spd_approach[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real+300,z_real,90,0,90,spd_approach);
 
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real+200,z_real+80,90,0,90,spd_approach[0], spd_approach[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real+100,z_real+100,90,0,90,spd_approach);
 
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,-520,-230,80,0,0,spd_approach[0], spd_approach[1]);
+            closeGripper();
+
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real+100,z_real+20,90,0,90,spd_approach);
+
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real+250,z_real+20,90,0,90,spd_approach);
+
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real+200,z_real+100,90,0,90,spd_approach);
+
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,-520,-230,80,0,0,spd_approach);
 
             closeGripper();
             break;
@@ -1176,12 +1223,12 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
             //-----------------shelf approach---------------------//
             ROS_INFO("PULL SHELF::Approach pose1");
             y_real+=50;
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach[0], spd_approach[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach);
 
 
             y_real-=50;
             ROS_INFO("PULL SHELF::Approach pose2");
-            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction[0], spd_approach_suction[1]);
+            Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real, spd_approach_suction);
 
             //--------------------Suction-------------------------//
             ROS_INFO("PULL SHELF::Suction");
@@ -1195,12 +1242,12 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
             {
                 printf("shelf2\n");
                 y_real += 400;
-                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_approach_suction[0], spd_approach_suction[1]);
+                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_approach_suction);
             }else if(_shelf == SHELF3)
             {
                 printf("shelf3\n");
                 y_real += 400;
-                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_approach_suction[0], spd_approach_suction[1]);
+                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_approach_suction);
             }
 
             //--------------------release suction -----------------------//
@@ -1214,11 +1261,11 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
                 ROS_INFO("PULL_SHELF::Final pose2");
                 z_real += 100;
                 y_real += 20;
-                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_fast);
 
 
                 ROS_INFO("PULL_SHELF::Shelf search pose2");
-                Sendcommand(CMD_MoveJoint,0,0,0,-77.34, 17.82, 122.3, -59.88, 87.82, -12.48, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,0,0,0,-77.34, 17.82, 122.3, -59.88, 87.82, -12.48, spd_fast);
 
 
                 ROS_INFO("Wheel move +0.3x");
@@ -1228,11 +1275,12 @@ void GraspAction::pullshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
                 ROS_INFO("PULL_SHELF::Final pose3");
                 z_real += 100;
                 y_real += 20;
-                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveTCP,0,0,0,x_real,y_real,z_real,r_real,p_real,oy_real,spd_fast);
 
 
                 ROS_INFO("PULL_SHELF::Shelf search pose3");
-                Sendcommand(CMD_MoveJoint,0,0,0,-77.34, -0.37, 78.9, 1.71, 87.83, -12.47, spd_fast[0], spd_fast[1]);
+                Sendcommand(CMD_MoveJoint,search_pose[JSHELF3_BACK],spd_fast);
+                Sendcommand(CMD_MoveJoint,0,0,0,-77.34, -0.37, 78.9, 1.71, 87.83, -12.47, spd_fast);
 
 
                 ROS_INFO("Wheel move +0.3x");
@@ -1264,6 +1312,8 @@ void GraspAction::pushshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
     {
     case SHELF1:
         openGripper(600);
+        ROS_INFO("Wheel move -0.3x");
+        Sendcommandwheel('W', 0, 1, -0.1, 0, 0);
         ROS_INFO("PUSH SHELF::Init pose1");
         motion = Shelf_Push1;
         break;
@@ -1297,9 +1347,13 @@ void GraspAction::pushshelf(const rb5_ros_wrapper::manipulationGoalConstPtr _goa
     if(_shelf == SHELF1)
     {
         ROS_INFO("Wheel move -0.3x");
-        Sendcommandwheel('W', 0, 1, -0.3, 0, 0);
+        Sendcommandwheel('W', 0, 1, -0.2, 0, 0);
+        goHome(SHELF1);
+    }else
+    {
+        goHome(IDLEPOSE);
+
     }
-    goHome();
 
     ROS_INFO("PUSH SHELF::Search pose done");
     MotionDone = DONE;
@@ -1347,7 +1401,7 @@ void GraspAction::TCPtoRB5(int _mode)
     if(_mode == TOOLMODE_GRIPPER)
         Poffset.setValue(-0.00035, 0.22122, 0.);
     else
-        Poffset.setValue(-0.0235, 0.23722, 0.);
+        Poffset.setValue(-0.0235, 0.23, 0.);
 
     Rtool = Rtarget;
     Ptool = Ptarget + Rtool*Poffset;
@@ -1365,8 +1419,8 @@ void GraspAction::TCPtoRB5(int _mode)
     {
         printf("mode is galgori\n");
         x_real = Ptarget.x()*1000;
-        y_real = Ptarget.y()*1000+ 405;
-        z_real = Ptarget.z()*1000+ 232;
+        y_real = Ptarget.y()*1000+ 410;
+        z_real = Ptarget.z()*1000+ 210;
         r_real = 90;
         p_real = 0;
         oy_real = 90;
@@ -1394,7 +1448,7 @@ void GraspAction::TCPtoRB5(Pose _pose,int _mode)
     if(_mode == TOOLMODE_GRIPPER)
         Poffset.setValue(-0.00035, 0.22122, 0.);
     else
-        Poffset.setValue(-0.0235, 0.22722, 0.);
+        Poffset.setValue(-0.0235, 0.23722, 0.);
 
     Rtool = Rtcp;
     Ptool = Ptcp + Rtool*Poffset;
@@ -1453,7 +1507,7 @@ public:
         switch(goal->motion_cmd)
         {
         case HOME_POSE:
-            newGrasp.goHome();
+            newGrasp.goHome(IDLEPOSE);
             break;
         case OBJECT_SEARCH:
             newGrasp.goSearch(goal);
