@@ -57,8 +57,19 @@ public:
         //change speed 50%
         ChangeSpeed(0.5);
         goHome(IDLEPOSE);
-        usleep(5000*1000);
-        goHome(IDLEPOSE);
+    }
+
+    void doTest()
+    {
+        ROS_INFO("Send Joint move");
+        Sendcommand(CMD_MoveJoint,0,0,0,-245.103, -138.91, 89.064, -132, -20, 0.21, 0.5,0.3);
+        if(MotionDone == EXT_COLLISION)
+        {
+            MotionDone = IDLE;
+            Sendcommand(CMD_MotionHalt,0,0,0,0,0,0,0,0,0,0,0);
+            ROS_ERROR("halt..");
+        }
+        ROS_INFO("Joint move done");
     }
 
     void doneCb(const actionlib::SimpleClientGoalState& state,
@@ -78,8 +89,7 @@ public:
             break;
         case EXT_COLLISION:
             ROS_ERROR("EXT COLLISION!!!!");
-            Sendcommand(CMD_MotionHalt,0,0,0,0,0,0,0,0,0,0,0);
-//            MotionDone = result->rb5result;
+            MotionDone = result->rb5result;
             break;
         }
 
@@ -547,17 +557,17 @@ void GraspAction::goHome(int _curPose)
     case SHELF1:
         ROS_INFO("Going home : SHELF1");
         Sendcommand(CMD_MoveJoint,home_pose[TSHELF1HOME],spd_fast);
-//        closeGripper();
+        closeGripper();
         break;
     case BASKET:
         ROS_INFO("Going home : BASKET");
         Sendcommand(CMD_MoveJoint,home_pose[JBASKETHOME],spd_fast);
-//        closeGripper();
+        closeGripper();
         break;
     default:
         ROS_INFO("Going home : DEFAULT");
         Sendcommand(CMD_MoveJoint,home_pose[JDEFAULTHOME],spd_fast);
-//        closeGripper();
+        closeGripper();
 
         break;
     }
@@ -1487,7 +1497,8 @@ public:
         action_name_(name)
     {
         as_.start();
-        newGrasp.doInit();
+//        newGrasp.doInit();
+        newGrasp.doTest();
     }
 
     ~manipulationAction(void)

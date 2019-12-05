@@ -32,7 +32,12 @@ int sock_result = 0;
 struct sockaddr_in ROSSocket;
 struct sockaddr_in RSTSocket;
 LANROS2PODO TX;
-LANPODO2ROS RX;
+RB5toROS RX;
+Result RXresult;
+int RXDataSize;
+void* RXBuffer;
+int RXResultDataSize;
+void* RXResultBuffer;
 
 pthread_t THREAD_t;
 
@@ -49,25 +54,14 @@ enum {
 ros::Publisher robot_states_pub;
 ros::Publisher marker_tf_pub;
 ros::Subscriber marker_tf_sub;
-ros::Subscriber marker1_tf_sub;
-ros::Subscriber marker2_tf_sub;
-ros::Subscriber marker3_tf_sub;
-ros::Subscriber marker4_tf_sub;
 ros::Subscriber shelf_marker_tf_sub;
 rb5_ros_wrapper::update message;
+
+
 float marker_x= 0.,marker_y= 0.,marker_z= 0.,marker_wx= 0.,marker_wy= 0.,marker_wz = 0.;
 float marker_w = 1.;
 float shelf_x= 0., shelf_y= 0.,shelf_z= 0.,shelf_wx= 0.,shelf_wy= 0.,shelf_wz = 0.;
 float shelf_w = 1.;
-
-float marker1_x= 0.,marker1_y= 0.,marker1_z= 0.,marker1_wx= 0.,marker1_wy= 0.,marker1_wz = 0.;
-float marker1_w = 1.;
-float marker2_x= 0.,marker2_y= 0.,marker2_z= 0.,marker2_wx= 0.,marker2_wy= 0.,marker2_wz = 0.;
-float marker2_w = 1.;
-float marker3_x= 0.,marker3_y= 0.,marker3_z= 0.,marker3_wx= 0.,marker3_wy= 0.,marker3_wz = 0.;
-float marker3_w = 1.;
-float marker4_x= 0.,marker4_y= 0.,marker4_z= 0.,marker4_wx= 0.,marker4_wy= 0.,marker4_wz = 0.;
-float marker4_w = 1.;
 
 bool connectROS()
 {
@@ -77,14 +71,21 @@ bool connectROS()
         return false;
     }
 
+
     ROSSocket.sin_family = AF_INET;
     ROSSocket.sin_port = htons(PORT1);
+
+    int optval = 1;
+    setsockopt(sock_status, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    setsockopt(sock_status, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
 
     if(inet_pton(AF_INET, IPAddr, &ROSSocket.sin_addr)<=0)
     {
         printf("\n Invalid Address \n");
         return false;
     }
+    RXDataSize = sizeof(RB5toROS);
+    RXBuffer = (void*)malloc(RXDataSize);
 
     if(connect(sock_status, (struct sockaddr *)&ROSSocket, sizeof(ROSSocket)) < 0)
     {
@@ -104,14 +105,21 @@ bool connectRST()
         return false;
     }
 
+
     RSTSocket.sin_family = AF_INET;
     RSTSocket.sin_port = htons(PORT2);
+
+    int optval = 1;
+    setsockopt(sock_result, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    setsockopt(sock_result, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
 
     if(inet_pton(AF_INET, IPAddr, &RSTSocket.sin_addr)<=0)
     {
         printf("\n Invalid Address \n");
         return false;
     }
+    RXResultDataSize = sizeof(Result);
+    RXResultBuffer = (void*)malloc(RXResultDataSize);
 
     if(connect(sock_result, (struct sockaddr *)&RSTSocket, sizeof(RSTSocket)) < 0)
     {
@@ -122,7 +130,6 @@ bool connectRST()
     printf("\n Client connected to server!(RST)\n");
     return true;
 }
-
 class MotionAction
 {
 protected:
@@ -191,20 +198,27 @@ public:
         bool success = true;
 
         //===write to RB5===
-        int rxDoneFlag = 0;
-        int activeFlag = 0;
+        int RXDoneFlag = 0;
+        int activeFlag = false;
 
         //write TX to RB5
         writeTX(goal);
 
         //loop until TX complete
 
-        while(rxDoneFlag == 0)
+        int cnt = 0;
+        while(RXDoneFlag == 0)
         {
-//            read(sock_result,RXresult.buffer,RXresult.size);
-//            memcpy(&RX.podo2ros.message, RXresult.buffer, RXresult.size);
-
-//            printf("rb5 result = %d\n",RX.podo2ros.message.rb5result);
+            if(read(sock_result, RXResultBuffer, RXResultDataSize) == RXResultDataSize)
+            {
+                memcpy(&RXresult, RXResultBuffer, RXResultDataSize);
+            }
+            if(cnt > 2000000)
+            {
+                printf("rb5 result = %d\n",RXresult.rb5_result);
+                cnt = 0;
+            }
+            cnt ++;
 
             //check that preempt has not been requested by client
             if(as_.isPreemptRequested() || !ros::ok())
@@ -216,7 +230,7 @@ public:
             }
 
             //check result flag
-            switch(RX.podo2ros.result.rb5_result)
+            switch(RXresult.rb5_result)
             {
             case ACCEPT:
                 if(activeFlag != true)
@@ -225,22 +239,20 @@ public:
                     activeFlag = true;
                 }
                 break;
+            case DONE:
+                RXDoneFlag = 1;
+                break;
             case STATE_ERROR:
             case INPUT_ERROR:
-            case DONE:
             case ERROR_STOP:
-                rxDoneFlag = 1;
-                ROS_INFO("rb5 : %d",RX.podo2ros.result.rb5_result);
-                break;
             case EXT_COLLISION:
                 ROS_ERROR("EXT COLLISION DETECTED!!!");
-                as_.setAborted(result_);
-                rxDoneFlag = 1;
+                RXDoneFlag = 1;
                 success = false;
                 break;
             }
 
-            switch(RX.podo2ros.result.wheel_result)
+            switch(RXresult.wheel_result)
             {
             case ACCEPT:
                 if(activeFlag != true)
@@ -249,23 +261,16 @@ public:
                     activeFlag = true;
                 }
                 break;
+            case DONE:
+                RXDoneFlag = 1;
+                break;
             case STATE_ERROR:
             case INPUT_ERROR:
-            case DONE:
             case ERROR_STOP:
-                rxDoneFlag = 1;
-                ROS_INFO("wheel : %d",RX.podo2ros.result.rb5_result);
+                RXDoneFlag = 1;
+                success = false;
                 break;
             }
-
-//            if(RX.podo2ros.messagecollision_detect == 1)
-//            {
-//                ROS_ERROR("EXT COLLISION DETECTED!!!");
-//                result_.rb5result = EXT_COLLISION;
-//                as_.setAborted(result_);
-//                rxDoneFlag = 1;
-//                success = false;
-//            }
 
             if(returnServerStatus())
             {
@@ -273,16 +278,19 @@ public:
             }
 
             //result setting
-            result_.rb5result = RX.podo2ros.result.rb5_result;
-            result_.wheelresult = RX.podo2ros.result.wheel_result;
-
-            //maintain desired loop rate
+            result_.rb5result = RXresult.rb5_result;
+            result_.wheelresult = RXresult.wheel_result;
         }
+
 
         if(success)
         {
             ROS_INFO("%s: Succeeded");
             as_.setSucceeded(result_);
+        }else
+        {
+            ROS_INFO("%s: Aborted");
+            as_.setAborted(result_);
         }
     }
 
@@ -296,36 +304,36 @@ public:
 
     void publishFeedback()
     {
-        if(RX.podo2ros.message.robot_state == robot_moving)
+        if(RX.message.robot_state == robot_moving)
         {
             feedback_.state = "Moving";
-        }else if(RX.podo2ros.message.robot_state == robot_paused)
+        }else if(RX.message.robot_state == robot_paused)
             feedback_.state = "Paused or Collision";
         else
             feedback_.state = "Idle";
 
-        if(RX.podo2ros.message.program_mode == real_mode)
+        if(RX.message.program_mode == real_mode)
             feedback_.mode = "Real";
         else
             feedback_.mode = "Simulation";
 
-        feedback_.collision = RX.podo2ros.message.collision_detect;
-        feedback_.freedrive = RX.podo2ros.message.freedrive_mode;
-        feedback_.speed = RX.podo2ros.message.speed;
+        feedback_.collision = RX.message.collision_detect;
+        feedback_.freedrive = RX.message.freedrive_mode;
+        feedback_.speed = RX.message.speed;
 
         for(int i = 0; i < 6; i++)
         {
-            feedback_.joint_ang[i] = RX.podo2ros.message.joint_angles[i];
-            feedback_.joint_ref[i] = RX.podo2ros.message.joint_references[i];
-            feedback_.joint_cur[i] = RX.podo2ros.message.joint_current[i];
-            feedback_.joint_temp[i] = RX.podo2ros.message.joint_temperature[i];
-            feedback_.joint_info[i] = RX.podo2ros.message.joint_information[i];
+            feedback_.joint_ang[i] = RX.message.joint_angles[i];
+            feedback_.joint_ref[i] = RX.message.joint_references[i];
+            feedback_.joint_cur[i] = RX.message.joint_current[i];
+            feedback_.joint_temp[i] = RX.message.joint_temperature[i];
+            feedback_.joint_info[i] = RX.message.joint_information[i];
 
-            feedback_.tcp_ref[i] = RX.podo2ros.message.tcp_reference[i];
-            feedback_.tcp_pos[i] = RX.podo2ros.message.tcp_position[i];
+            feedback_.tcp_ref[i] = RX.message.tcp_reference[i];
+            feedback_.tcp_pos[i] = RX.message.tcp_position[i];
         }
 
-        feedback_.tool_ref = RX.podo2ros.message.tool_reference;
+        feedback_.tool_ref = RX.message.tool_reference;
 
         as_.publishFeedback(feedback_);
     }
@@ -345,62 +353,6 @@ void markerCallback(const wrs_fsm::tf_broadcastPtr& msg)
     marker_wz= msg->wz;
 }
 
-void marker1Callback(const wrs_fsm::tf_broadcastPtr& msg)
-{
-    if(msg->w == 0)
-        return;
-
-    marker1_x = msg->x ;
-    marker1_y = msg->y ;
-    marker1_z = msg->z ;
-    marker1_w = msg->w ;
-    marker1_wx= msg->wx;
-    marker1_wy= msg->wy;
-    marker1_wz= msg->wz;
-}
-
-void marker2Callback(const wrs_fsm::tf_broadcastPtr& msg)
-{
-    if(msg->w == 0)
-        return;
-
-    marker2_x = msg->x ;
-    marker2_y = msg->y ;
-    marker2_z = msg->z ;
-    marker2_w = msg->w ;
-    marker2_wx= msg->wx;
-    marker2_wy= msg->wy;
-    marker2_wz= msg->wz;
-}
-
-void marker3Callback(const wrs_fsm::tf_broadcastPtr& msg)
-{
-    if(msg->w == 0)
-        return;
-
-    marker3_x = msg->x ;
-    marker3_y = msg->y ;
-    marker3_z = msg->z ;
-    marker3_w = msg->w ;
-    marker3_wx= msg->wx;
-    marker3_wy= msg->wy;
-    marker3_wz= msg->wz;
-}
-
-void marker4Callback(const wrs_fsm::tf_broadcastPtr& msg)
-{
-    if(msg->w == 0)
-        return;
-
-    marker4_x = msg->x ;
-    marker4_y = msg->y ;
-    marker4_z = msg->z ;
-    marker4_w = msg->w ;
-    marker4_wx= msg->wx;
-    marker4_wy= msg->wy;
-    marker4_wz= msg->wz;
-}
-
 void shelfCallback(const wrs_fsm::tf_broadcastPtr& msg)
 {
     if(msg->w == 0)
@@ -414,9 +366,6 @@ void shelfCallback(const wrs_fsm::tf_broadcastPtr& msg)
     shelf_wy= msg->wy;
     shelf_wz= msg->wz;
 }
-
-
-/* === Thread for topics ===*/
 
 
 int main(int argc, char *argv[])
@@ -437,36 +386,31 @@ int main(int argc, char *argv[])
         printf("waitForResult\n\n Failed to connect. Closing...\n");
         return -1;
     }
-//    if(connectRST() == false)
-//    {
-//        printf("waitForResult\n\n Failed to connect. Closing...\n");
-//        return -1;
-//    }
+    if(connectRST() == false)
+    {
+        printf("waitForResult\n\n Failed to connect. Closing...\n");
+        return -1;
+    }
 
     ROS_INFO("Starting Action Server");
-//    MotionAction motion("motion");
+    MotionAction motion("motion");
 
-    ROS_INFO("Starting Action Server");
     while(1)
     {
-        ROS_INFO("Starting Action Server");
-        printf("1");
         //read robot status from PODO
-        read(sock_status, RX.buffer, RX.size);
-        printf("2");
-        memcpy(&RX, RX.buffer, 1);
-//        memcpy(&RX, RX.buffer, RX.size);
-        printf("3");
-
+        if(read(sock_status, RXBuffer, RXDataSize) == RXDataSize)
+        {
+            memcpy(&RX, RXBuffer, RXDataSize);
+        }
 
         //publish robot status
-        message.robot_state = RX.podo2ros.message.robot_state;
-        message.power_state = RX.podo2ros.message.power_state;
-        message.program_mode = RX.podo2ros.message.program_mode;
-        message.collision_detect = RX.podo2ros.message.collision_detect;
-        message.freedrive_mode = RX.podo2ros.message.freedrive_mode;
-        message.speed = RX.podo2ros.message.speed;
-        message.tool_reference = RX.podo2ros.message.tool_reference;
+        message.robot_state = RX.message.robot_state;
+        message.power_state = RX.message.power_state;
+        message.program_mode = RX.message.program_mode;
+        message.collision_detect = RX.message.collision_detect;
+        message.freedrive_mode = RX.message.freedrive_mode;
+        message.speed = RX.message.speed;
+        message.tool_reference = RX.message.tool_reference;
 
         //TF broadcasting
         ros::Time now = ros::Time::now();
@@ -476,8 +420,8 @@ int main(int argc, char *argv[])
         Trb5_base.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_base, now, "/base_link", "/rb5/base"));
 
-        Trb5_wrist.setOrigin(tf::Vector3(RX.podo2ros.message.tcp_position[0]/1000.,RX.podo2ros.message.tcp_position[1]/1000.,RX.podo2ros.message.tcp_position[2]/1000.));
-        tempq.setEulerZYX(RX.podo2ros.message.tcp_position[5]*D2R, RX.podo2ros.message.tcp_position[4]*D2R, RX.podo2ros.message.tcp_position[3]*D2R);
+        Trb5_wrist.setOrigin(tf::Vector3(RX.message.tcp_position[0]/1000.,RX.message.tcp_position[1]/1000.,RX.message.tcp_position[2]/1000.));
+        tempq.setEulerZYX(RX.message.tcp_position[5]*D2R, RX.message.tcp_position[4]*D2R, RX.message.tcp_position[3]*D2R);
         Trb5_wrist.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_wrist, now, "/rb5/base", "/rb5/wrist"));
 
@@ -509,13 +453,13 @@ int main(int argc, char *argv[])
 
         for(int i=0;i<6;i++)
         {
-            message.joint_angles[i] = RX.podo2ros.message.joint_angles[i];
-            message.joint_references[i] = RX.podo2ros.message.joint_references[i];
-            message.joint_current[i] = RX.podo2ros.message.joint_current[i];
-            message.joint_temperature[i] = RX.podo2ros.message.joint_temperature[i];
-            message.joint_information[i] = RX.podo2ros.message.joint_information[i];
-            message.tcp_reference[i] = RX.podo2ros.message.tcp_reference[i];
-            message.tcp_position[i] = RX.podo2ros.message.tcp_position[i];
+            message.joint_angles[i] = RX.message.joint_angles[i];
+            message.joint_references[i] = RX.message.joint_references[i];
+            message.joint_current[i] = RX.message.joint_current[i];
+            message.joint_temperature[i] = RX.message.joint_temperature[i];
+            message.joint_information[i] = RX.message.joint_information[i];
+            message.tcp_reference[i] = RX.message.tcp_reference[i];
+            message.tcp_position[i] = RX.message.tcp_position[i];
         }
         robot_states_pub.publish(message);
         //callback check
