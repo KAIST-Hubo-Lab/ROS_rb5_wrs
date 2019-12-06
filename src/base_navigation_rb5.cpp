@@ -63,7 +63,7 @@ const float     PI   = 3.14159265;
 #define arrival_threshold 2 //arrival grid size
 #define averageWindowN 5    //sample number for low-pass filter
 #define grid_resolution 0.1 //meter
-#define marker_offset_z 0.8
+#define marker_offset_z 0.922
 
 /* ========= global variables ========== */
 ros::Publisher path_pub; //path difference

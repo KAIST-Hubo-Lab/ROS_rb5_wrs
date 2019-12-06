@@ -66,12 +66,16 @@ enum{
 const float w_line = 0.018;
 const int max_gripper_cnt = 600;
 
-const float spd_approach_suction[2] =   {0.1, 0.02};
 const float spd_put[2] =                {0.5, 0.3};
 const float spd_half[2] =               {0.5, 0.3};
+
+const float spd_lift[2] =               {0.4, 0.15};
+
 const float spd_approach[2] =           {0.3, 0.05};
-const float spd_fast[2] =               {0.8, 0.5};
-const float spd_lift[2] =               {0.5, 0.2};
+
+const float spd_10[2] =                 {0.1, 0.02};
+const float spd_60[2] =                 {0.6, 0.2};
+const float spd_80[2] =                 {0.8, 0.4};
 
 //grasp [m]
 const float z_limit_object = 0.01;
@@ -79,8 +83,8 @@ const float z_grasp_approach = 0.1;
 const float z_put = 0.015;
 const float y_put_object = 0.03;
 const float y_pull_object = 0.04;
-const float z_grasp_offset[2] = {0.0, -0.0};
-const float z_put_offset[2] = {0.01, 0.03};
+const float z_grasp_offset[2] = {0.005, -0.00};
+const float z_put_offset[2] = {0.01, 0.02};
 
 //limit [m]
 const float limit_marker_offset_f = 0.03;
@@ -90,7 +94,11 @@ const float limit_marker_z = 0.005;
 const float shlef_distance_z = 0.2;
 const float shelf_y_offset = 0.355;
 
-
+//gripper_cnt
+const int GRIPPER_FIRST = 160;
+const int GRIPPER_SECOND = 250;
+const int GRIPPER_BASKET = 250;
+const int GRIPPER_PUT = 120;
 
 
 
@@ -138,12 +146,12 @@ typedef struct pose{
 
 const object_info Info_Object[] = {
     //line1,            line2,              depth,      f_dep,      height,     width,      z_lift,     toolmode
-    { 0.057+w_line/2,    0.157+w_line/2,    0.035,      0.020,      0.08,        0.08,      0.1,        TOOLMODE_GRIPPER},    //kimbap1
-    {-0.056-w_line/2,   -0.156-w_line/2,    0.035,      0.020,      0.08,       -0.08,      0.1,        TOOLMODE_GRIPPER},   //kimbap2
-    { 0.120+w_line/2,    0.228+w_line/2,    0.090,      0.075,      0.125,       0.09,      0.2,        TOOLMODE_GRIPPER},    //sandwich
-    {-0.158+w_line/2,   -0.336+w_line/2,    0.065,      0.065/2,    0.115,      -0.16,      0.2,        TOOLMODE_GRIPPER},  //hambug
-    { 0.199+w_line/2,    0.288+w_line/2,    0.09,       0.08/2,     0.12,        0.09,      0.2,        TOOLMODE_SUCTION},    //coffee
-    {-0.111-w_line/2,   -0.379-w_line/2,    0.0,        0.17/2,     0.038,      -0.25,      0.1,        TOOLMODE_SUCTION}   //lunchbox
+    { 0.057+w_line/2,    0.157+w_line/2,    0.035,      0.020,      0.085,        0.08,      0.1,        TOOLMODE_GRIPPER},    //kimbap1
+    {-0.056-w_line/2,   -0.156-w_line/2,    0.035,      0.020,      0.085,       -0.08,      0.1,        TOOLMODE_GRIPPER},   //kimbap2
+    { 0.120+w_line/2,    0.228+w_line/2,    0.090,      0.075,      0.130,       0.09,      0.2,        TOOLMODE_GRIPPER},    //sandwich
+    {-0.158+w_line/2,   -0.336+w_line/2,    0.065,      0.065/2,    0.130,      -0.16,      0.2,        TOOLMODE_GRIPPER},  //hambug
+    { 0.199+w_line/2,    0.288+w_line/2,    0.09,       0.07/2,     0.118,     0.09,    0.2,        TOOLMODE_SUCTION},    //coffee
+    {-0.111-w_line/2,   -0.379-w_line/2,    0.0,        0.16/2,     0.038,      -0.25,      0.1,        TOOLMODE_SUCTION}   //lunchbox
 };
 
 typedef struct shelf_infoooo{
@@ -197,7 +205,8 @@ const marker_info I_M[] = { //Info marker
 //};
 
 const pose shelf_marker[] = {
-    {0.,    -1.049,    I_S[SHELF1].height+I_M[0].z_offset},
+//    {0.,    -1.049,    I_S[SHELF1].height+I_M[0].z_offset},
+    {0.,    -1.063298,  -0.559},
     {0.,    -1.049,    I_S[SHELF2].height+I_M[0].z_offset},
     {0.,    -1.049,    I_S[SHELF3].height+I_M[0].z_offset},
     {0., 0., 0.},
