@@ -32,7 +32,7 @@ int sock_result = 0;
 struct sockaddr_in ROSSocket;
 struct sockaddr_in RSTSocket;
 LANROS2PODO TX;
-RB5toROS RX;
+Update RX;
 Result RXresult;
 int RXDataSize;
 void* RXBuffer;
@@ -84,7 +84,7 @@ bool connectROS()
         printf("\n Invalid Address \n");
         return false;
     }
-    RXDataSize = sizeof(RB5toROS);
+    RXDataSize = sizeof(Update);
     RXBuffer = (void*)malloc(RXDataSize);
 
     if(connect(sock_status, (struct sockaddr *)&ROSSocket, sizeof(ROSSocket)) < 0)
@@ -304,36 +304,36 @@ public:
 
     void publishFeedback()
     {
-        if(RX.message.robot_state == robot_moving)
+        if(RX.robot_state == robot_moving)
         {
             feedback_.state = "Moving";
-        }else if(RX.message.robot_state == robot_paused)
+        }else if(RX.robot_state == robot_paused)
             feedback_.state = "Paused or Collision";
         else
             feedback_.state = "Idle";
 
-        if(RX.message.program_mode == real_mode)
+        if(RX.program_mode == real_mode)
             feedback_.mode = "Real";
         else
             feedback_.mode = "Simulation";
 
-        feedback_.collision = RX.message.collision_detect;
-        feedback_.freedrive = RX.message.freedrive_mode;
-        feedback_.speed = RX.message.speed;
+        feedback_.collision = RX.collision_detect;
+        feedback_.freedrive = RX.freedrive_mode;
+        feedback_.speed = RX.speed;
 
         for(int i = 0; i < 6; i++)
         {
-            feedback_.joint_ang[i] = RX.message.joint_angles[i];
-            feedback_.joint_ref[i] = RX.message.joint_references[i];
-            feedback_.joint_cur[i] = RX.message.joint_current[i];
-            feedback_.joint_temp[i] = RX.message.joint_temperature[i];
-            feedback_.joint_info[i] = RX.message.joint_information[i];
+            feedback_.joint_ang[i] = RX.joint_angles[i];
+            feedback_.joint_ref[i] = RX.joint_references[i];
+            feedback_.joint_cur[i] = RX.joint_current[i];
+            feedback_.joint_temp[i] = RX.joint_temperature[i];
+            feedback_.joint_info[i] = RX.joint_information[i];
 
-            feedback_.tcp_ref[i] = RX.message.tcp_reference[i];
-            feedback_.tcp_pos[i] = RX.message.tcp_position[i];
+            feedback_.tcp_ref[i] = RX.tcp_reference[i];
+            feedback_.tcp_pos[i] = RX.tcp_position[i];
         }
 
-        feedback_.tool_ref = RX.message.tool_reference;
+        feedback_.tool_ref = RX.tool_reference;
 
         as_.publishFeedback(feedback_);
     }
@@ -404,13 +404,13 @@ int main(int argc, char *argv[])
         }
 
         //publish robot status
-        message.robot_state = RX.message.robot_state;
-        message.power_state = RX.message.power_state;
-        message.program_mode = RX.message.program_mode;
-        message.collision_detect = RX.message.collision_detect;
-        message.freedrive_mode = RX.message.freedrive_mode;
-        message.speed = RX.message.speed;
-        message.tool_reference = RX.message.tool_reference;
+        message.robot_state = RX.robot_state;
+        message.power_state = RX.power_state;
+        message.program_mode = RX.program_mode;
+        message.collision_detect = RX.collision_detect;
+        message.freedrive_mode = RX.freedrive_mode;
+        message.speed = RX.speed;
+        message.tool_reference = RX.tool_reference;
 
         //TF broadcasting
         ros::Time now = ros::Time::now();
@@ -420,8 +420,8 @@ int main(int argc, char *argv[])
         Trb5_base.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_base, now, "/base_link", "/rb5/base"));
 
-        Trb5_wrist.setOrigin(tf::Vector3(RX.message.tcp_position[0]/1000.,RX.message.tcp_position[1]/1000.,RX.message.tcp_position[2]/1000.));
-        tempq.setEulerZYX(RX.message.tcp_position[5]*D2R, RX.message.tcp_position[4]*D2R, RX.message.tcp_position[3]*D2R);
+        Trb5_wrist.setOrigin(tf::Vector3(RX.tcp_position[0]/1000.,RX.tcp_position[1]/1000.,RX.tcp_position[2]/1000.));
+        tempq.setEulerZYX(RX.tcp_position[5]*D2R, RX.tcp_position[4]*D2R, RX.tcp_position[3]*D2R);
         Trb5_wrist.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_wrist, now, "/rb5/base", "/rb5/wrist"));
 
@@ -453,13 +453,14 @@ int main(int argc, char *argv[])
 
         for(int i=0;i<6;i++)
         {
-            message.joint_angles[i] = RX.message.joint_angles[i];
-            message.joint_references[i] = RX.message.joint_references[i];
-            message.joint_current[i] = RX.message.joint_current[i];
-            message.joint_temperature[i] = RX.message.joint_temperature[i];
-            message.joint_information[i] = RX.message.joint_information[i];
-            message.tcp_reference[i] = RX.message.tcp_reference[i];
-            message.tcp_position[i] = RX.message.tcp_position[i];
+            message.joint_angles[i] = RX.joint_angles[i];
+            message.joint_references[i] = RX.joint_references[i];
+            message.joint_current[i] = RX.joint_current[i];
+            message.joint_temperature[i] = RX.joint_temperature[i];
+            message.joint_information[i] = RX.joint_information[i];
+            message.tcp_reference[i] = RX.tcp_reference[i];
+            message.tcp_position[i] = RX.tcp_position[i];
+            message.ft_sensor[i] = RX.ft_sensor[i];
         }
         robot_states_pub.publish(message);
         //callback check
