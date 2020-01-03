@@ -20,3 +20,4 @@ float64[6]  tcp_position
 
 float64     tool_reference      #reference voltage [0, 12, 24V]
 
+float64[6]  ft_sensor

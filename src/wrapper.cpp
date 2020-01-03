@@ -11,7 +11,6 @@
 #include <tf/transform_broadcaster.h>
 #include <rb5_ros_wrapper/MotionAction.h>
 #include <math.h>
-#include <wrs_fsm/tf_broadcast.h>
 #include "rb5_ros_wrapper/update.h"
 #include "lanros2podo.h"
 #include "lanpodo2ros.h"
@@ -53,8 +52,6 @@ enum {
 
 ros::Publisher robot_states_pub;
 ros::Publisher marker_tf_pub;
-ros::Subscriber marker_tf_sub;
-ros::Subscriber shelf_marker_tf_sub;
 rb5_ros_wrapper::update message;
 
 
@@ -339,34 +336,6 @@ public:
     }
 };
 
-void markerCallback(const wrs_fsm::tf_broadcastPtr& msg)
-{
-    if(msg->w == 0)
-        return;
-
-    marker_x = msg->x ;
-    marker_y = msg->y ;
-    marker_z = msg->z ;
-    marker_w = msg->w ;
-    marker_wx= msg->wx;
-    marker_wy= msg->wy;
-    marker_wz= msg->wz;
-}
-
-void shelfCallback(const wrs_fsm::tf_broadcastPtr& msg)
-{
-    if(msg->w == 0)
-        return;
-
-    shelf_x = msg->x ;
-    shelf_y = msg->y ;
-    shelf_z = msg->z ;
-    shelf_w = msg->w ;
-    shelf_wx= msg->wx;
-    shelf_wy= msg->wy;
-    shelf_wz= msg->wz;
-}
-
 
 int main(int argc, char *argv[])
 {
@@ -374,11 +343,9 @@ int main(int argc, char *argv[])
     ros::NodeHandle n;
 
     robot_states_pub = n.advertise<rb5_ros_wrapper::update>("/robot_states",1);
-    marker_tf_sub = n.subscribe("/marker_tf", 1, &markerCallback);
-    shelf_marker_tf_sub = n.subscribe("/shelf_marker_tf", 1, &shelfCallback);
 
     tf::TransformBroadcaster br;
-    tf::Transform Trb5_wrist, Trb5_base, Trb5_gripper, Trb5_suction, Trb5_camera, Trb5_marker, Trb5_shelf;
+    tf::Transform Trb5_wrist, Trb5_base, Trb5_gripper, Trb5_camera;
     tf::Quaternion tempq;
 
     if(connectROS() == false)
@@ -430,26 +397,10 @@ int main(int argc, char *argv[])
         Trb5_gripper.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_gripper, ros::Time::now(), "/rb5/wrist", "/rb5/gripper"));
 
-        Trb5_suction.setOrigin(tf::Vector3(0.00025, -0.07345, -0.143));
-        tempq.setEulerZYX(0., 0., 90.*D2R);
-        Trb5_suction.setRotation(tempq);
-        br.sendTransform(tf::StampedTransform(Trb5_suction, ros::Time::now(), "/rb5/wrist", "/rb5/suction"));
-
         Trb5_camera.setOrigin(tf::Vector3(0.0325, -0.1008, 0.0730));
         tempq.setEulerZYX(180.*D2R, 0., -90.*D2R);
         Trb5_camera.setRotation(tempq);
         br.sendTransform(tf::StampedTransform(Trb5_camera, ros::Time::now(), "/rb5/wrist", "/camera1"));
-
-        Trb5_marker.setOrigin(tf::Vector3(marker_x,marker_y,marker_z));
-        tempq = tf::Quaternion(marker_wx,marker_wy,marker_wz,marker_w);
-        Trb5_marker.setRotation(tempq);
-        br.sendTransform(tf::StampedTransform(Trb5_marker, ros::Time::now(), "/camera1", "/marker1"));
-
-        Trb5_shelf.setOrigin(tf::Vector3(shelf_x,shelf_y,shelf_z));
-        tempq = tf::Quaternion(shelf_wx,shelf_wy,shelf_wz,shelf_w);
-        Trb5_shelf.setRotation(tempq);
-        br.sendTransform(tf::StampedTransform(Trb5_shelf, ros::Time::now(), "/camera1", "/shelf"));
-
 
         for(int i=0;i<6;i++)
         {
